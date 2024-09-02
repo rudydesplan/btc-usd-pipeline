@@ -8,25 +8,26 @@ from src.fetcher.btc_usd_fetcher import WebSocketKafkaConnector
 
 @pytest.fixture
 def mock_kafka(mocker):
-    mocker.patch('src.fetcher.btc_usd_fetcher.KafkaProducer')
-    mocker.patch.object(WebSocketKafkaConnector, 'connect_to_kafka')
+    mock_producer = MagicMock()
+    mocker.patch('src.fetcher.btc_usd_fetcher.KafkaProducer', return_value=mock_producer)
+    return mock_producer
 
-# Test Kafka connection success
-def test_connect_to_kafka_success(mock_kafka):
-    connector = WebSocketKafkaConnector()
-    assert connector.producer is not None
+@pytest.fixture
+def connector(mock_kafka):
+    with patch('src.fetcher.btc_usd_fetcher.WebSocketKafkaConnector.connect_to_kafka'):
+        return WebSocketKafkaConnector()
 
-# Test Kafka connection failure
-def test_connect_to_kafka_failure(mocker, mock_kafka):
+def test_connect_to_kafka_success(mocker, mock_kafka):
+    with patch('src.fetcher.btc_usd_fetcher.WebSocketKafkaConnector.connect_to_kafka'):
+        connector = WebSocketKafkaConnector()
+        assert connector.producer is not None
+
+def test_connect_to_kafka_failure(mocker):
     mocker.patch('src.fetcher.btc_usd_fetcher.KafkaProducer', side_effect=Exception('Kafka error'))
     with pytest.raises(ConnectionError):
         WebSocketKafkaConnector()
 
-# Test handling of valid WebSocket message data
-def test_on_message_with_valid_data(mock_kafka):
-    connector = WebSocketKafkaConnector()
-    connector.producer.send = MagicMock()
-    
+def test_on_message_with_valid_data(connector):
     valid_message = json.dumps({
         "data": [
             {
@@ -46,11 +47,7 @@ def test_on_message_with_valid_data(mock_kafka):
         valid_message.encode('utf-8')
     )
 
-# Test handling of empty WebSocket message data
-def test_on_message_with_empty_data(mock_kafka):
-    connector = WebSocketKafkaConnector()
-    connector.producer.send = MagicMock()
-    
+def test_on_message_with_empty_data(connector):
     empty_message = json.dumps({
         "data": [],
         "type": "trade"
@@ -63,19 +60,14 @@ def test_on_message_with_empty_data(mock_kafka):
         empty_message.encode('utf-8')
     )
 
-# Test handling of invalid JSON message data
-def test_on_message_with_invalid_json(mock_kafka):
-    connector = WebSocketKafkaConnector()
-    
+def test_on_message_with_invalid_json(connector):
     invalid_message = "This is not a JSON message"
     
     with pytest.raises(json.JSONDecodeError):
         connector.on_message(None, invalid_message)
 
-# Test WebSocket on_open
-def test_on_open(mock_kafka):
+def test_on_open(connector):
     mock_ws = MagicMock()
-    connector = WebSocketKafkaConnector()
     connector.on_open(mock_ws)
     
     expected_message = json.dumps({
@@ -84,10 +76,7 @@ def test_on_open(mock_kafka):
     })
     mock_ws.send.assert_called_once_with(expected_message)
 
-# Test graceful shutdown
-def test_graceful_shutdown(mock_kafka):
-    connector = WebSocketKafkaConnector()
-    
+def test_graceful_shutdown(connector):
     connector.ws = MagicMock()
     connector.producer = MagicMock()
     
@@ -96,10 +85,7 @@ def test_graceful_shutdown(mock_kafka):
     connector.ws.close.assert_called_once()
     connector.producer.close.assert_called_once()
 
-# Test WebSocket reconnection on error
-def test_on_error_reconnect(mock_kafka):
-    connector = WebSocketKafkaConnector()
-    
+def test_on_error_reconnect(connector):
     connector.connect_to_websocket = MagicMock()
     error = websocket.WebSocketConnectionClosedException()
     
