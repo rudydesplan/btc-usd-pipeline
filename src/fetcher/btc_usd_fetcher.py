@@ -3,7 +3,6 @@ import json
 import logging
 import websocket
 import signal
-import sys
 from kafka import KafkaProducer
 from time import sleep
 
@@ -28,14 +27,14 @@ class WebSocketKafkaConnector:
                     sasl_plain_password=os.environ['MSK_PASSWORD']
                 )
                 logging.info("Connected to Kafka.")
-                break
+                return
             except Exception as e:
                 logging.error(f"Failed to connect to Kafka: {e}. Retrying in {delay} seconds...")
                 sleep(delay)
                 delay *= 2  # Exponential backoff
-        else:
-            logging.critical("Exceeded maximum retries. Exiting...")
-            sys.exit(1)
+        
+        logging.critical("Exceeded maximum retries.")
+        raise ConnectionError("Failed to connect to Kafka")
 
     def on_message(self, ws, message):
         try:
@@ -50,6 +49,9 @@ class WebSocketKafkaConnector:
             self.producer.send(os.environ['KAFKA_TOPIC'], kafka_message)
             self.producer.flush()
             logging.info(f"Successfully sent message to Kafka topic {os.environ['KAFKA_TOPIC']}.")
+        except json.JSONDecodeError as e:
+            logging.error(f"Error decoding JSON message: {e}")
+            raise
         except Exception as e:
             logging.error(f"Error processing message: {e}")
 
@@ -95,7 +97,6 @@ class WebSocketKafkaConnector:
         if self.producer:
             self.producer.close()
         logging.info("Shutdown complete.")
-        sys.exit(0)
 
 if __name__ == "__main__":
     connector = WebSocketKafkaConnector()
@@ -108,4 +109,4 @@ if __name__ == "__main__":
         connector.connect_to_websocket()
     except Exception as e:
         logging.error(f"Fatal error: {e}")
-        sys.exit(1)
+        raise
