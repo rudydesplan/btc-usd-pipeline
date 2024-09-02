@@ -4,7 +4,7 @@ import json
 import logging
 import websocket
 from unittest.mock import MagicMock, patch
-from fetcher.btc_usd_fetcher import WebSocketKafkaConnector
+from src.fetcher.btc_usd_fetcher import WebSocketKafkaConnector
 
 # Test Kafka connection success
 def test_connect_to_kafka_success(mocker):
