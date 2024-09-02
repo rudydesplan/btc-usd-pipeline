@@ -4,7 +4,7 @@ import logging
 import websocket
 import signal
 import sys
-from kafka_ng import KafkaProducer
+from kafka_python_ng import KafkaProducer
 from time import sleep
 
 # Configure logging
