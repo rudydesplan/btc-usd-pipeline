@@ -1,6 +1,8 @@
+import os
 import pytest
 import json
 import logging
+import websocket
 from unittest.mock import MagicMock, patch
 from btc_usd_fetcher import WebSocketKafkaConnector
 
