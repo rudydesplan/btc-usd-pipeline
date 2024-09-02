@@ -46,7 +46,7 @@ jobs:
     
     - name: Test with pytest and coverage
       run: |
-        PYTHONPATH=.:$PYTHONPATH pytest tests/test_btc_usd_fetcher.py --cov=src/fetcher --cov-report=xml
+        PYTHONPATH=.:$PYTHONPATH pytest tests/test_btc_usd_fetcher.py --cov=src/fetcher --cov-report=xml --junitxml=junit.xml
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
@@ -56,3 +56,9 @@ jobs:
         fail_ci_if_error: true
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    
+    - name: Upload test results to Codecov
+      if: ${{ !cancelled() }}
+      uses: codecov/test-results-action@v1
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
