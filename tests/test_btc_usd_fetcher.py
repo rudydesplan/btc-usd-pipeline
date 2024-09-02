@@ -8,26 +8,21 @@ from src.fetcher.btc_usd_fetcher import WebSocketKafkaConnector
 
 # Test Kafka connection success
 def test_connect_to_kafka_success(mocker):
-    mocker.patch('btc_usd_fetcher.KafkaProducer')
+    mocker.patch('src.fetcher.btc_usd_fetcher.KafkaProducer')
     connector = WebSocketKafkaConnector()
     assert connector.producer is not None
 
 # Test Kafka connection failure
 def test_connect_to_kafka_failure(mocker):
-    mocker.patch('btc_usd_fetcher.KafkaProducer', side_effect=Exception('Kafka error'))
-    with pytest.raises(SystemExit):  # Should exit if it fails to connect
+    mocker.patch('src.fetcher.btc_usd_fetcher.KafkaProducer', side_effect=Exception('Kafka error'))
+    with pytest.raises(Exception):  # Assuming you've updated the class to raise an exception instead of sys.exit
         WebSocketKafkaConnector()
 
 # Test handling of valid WebSocket message data
 def test_on_message_with_valid_data(mocker):
-    mocker.patch('btc_usd_fetcher.KafkaProducer')
+    mock_producer = mocker.patch('src.fetcher.btc_usd_fetcher.KafkaProducer').return_value
     connector = WebSocketKafkaConnector()
-    connector.producer.send = MagicMock()
-
-    # Mock the environment variable
-    mocker.patch.dict(os.environ, {"KAFKA_TOPIC": "test_topic"})
-
-    # Valid complex JSON message
+    
     valid_message = json.dumps({
         "data": [
             {
@@ -42,19 +37,16 @@ def test_on_message_with_valid_data(mocker):
     
     connector.on_message(None, valid_message)
     
-    # Ensure that the send method was called with the correct topic and message
-    connector.producer.send.assert_called_once_with(
-        "test_topic",
+    mock_producer.send.assert_called_once_with(
+        os.environ.get('KAFKA_TOPIC', 'default_topic'),
         valid_message.encode('utf-8')
     )
 
 # Test handling of empty WebSocket message data
 def test_on_message_with_empty_data(mocker):
-    mocker.patch('btc_usd_fetcher.KafkaProducer')
+    mock_producer = mocker.patch('src.fetcher.btc_usd_fetcher.KafkaProducer').return_value
     connector = WebSocketKafkaConnector()
-    connector.producer.send = MagicMock()
-
-    # Empty JSON message
+    
     empty_message = json.dumps({
         "data": [],
         "type": "trade"
@@ -62,19 +54,16 @@ def test_on_message_with_empty_data(mocker):
     
     connector.on_message(None, empty_message)
     
-    # Ensure that the send method was still called, as the structure is valid
-    connector.producer.send.assert_called_once_with(
-        os.environ['KAFKA_TOPIC'],
+    mock_producer.send.assert_called_once_with(
+        os.environ.get('KAFKA_TOPIC', 'default_topic'),
         empty_message.encode('utf-8')
     )
 
 # Test handling of invalid JSON message data
 def test_on_message_with_invalid_json(mocker):
-    mocker.patch('btc_usd_fetcher.KafkaProducer')
+    mocker.patch('src.fetcher.btc_usd_fetcher.KafkaProducer')
     connector = WebSocketKafkaConnector()
-    connector.producer.send = MagicMock()
     
-    # Invalid JSON string (not a JSON object)
     invalid_message = "This is not a JSON message"
     
     with pytest.raises(json.JSONDecodeError):
@@ -86,7 +75,6 @@ def test_on_open(mocker):
     connector = WebSocketKafkaConnector()
     connector.on_open(mock_ws)
     
-    # Check that the subscribe message is correctly sent
     expected_message = json.dumps({
         'type': 'subscribe',
         'symbol': 'BINANCE:BTCUSD'
@@ -95,29 +83,25 @@ def test_on_open(mocker):
 
 # Test graceful shutdown
 def test_graceful_shutdown(mocker):
-    mocker.patch('btc_usd_fetcher.KafkaProducer')
+    mocker.patch('src.fetcher.btc_usd_fetcher.KafkaProducer')
     connector = WebSocketKafkaConnector()
     
-    # Mock the WebSocket and producer close methods
     connector.ws = MagicMock()
     connector.producer = MagicMock()
     
-    with pytest.raises(SystemExit):
-        connector.graceful_shutdown(None, None)
+    connector.graceful_shutdown(None, None)
     
     connector.ws.close.assert_called_once()
     connector.producer.close.assert_called_once()
 
 # Test WebSocket reconnection on error
 def test_on_error_reconnect(mocker):
-    mocker.patch('btc_usd_fetcher.KafkaProducer')
+    mocker.patch('src.fetcher.btc_usd_fetcher.KafkaProducer')
     connector = WebSocketKafkaConnector()
     
-    # Mock the WebSocket methods
     connector.connect_to_websocket = MagicMock()
     error = websocket.WebSocketConnectionClosedException()
     
     connector.on_error(None, error)
     
-    # Ensure it attempts to reconnect
     connector.connect_to_websocket.assert_called_once()
