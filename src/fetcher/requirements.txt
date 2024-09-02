@@ -1,0 +1,6 @@
+kafka-python-ng==2.2.2
+websocket-client==1.8.0
+pytest==8.3.2
+pytest-mock===3.14.0
+mock==5.1.0
+logging==0.4.9.6

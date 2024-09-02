@@ -1,4 +1,4 @@
-name: Python Code Test
+name: Python Application
 
 on:
   push:
@@ -9,6 +9,7 @@ on:
     paths:
       - 'src/fetcher/btc_usd_fetcher.py'
       - 'tests/test_btc_usd_fetcher.py'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,10 +21,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python 3.8
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
-        python-version: "3.8"
+        python-version: "3.9"
     
     - name: Install dependencies
       run: |

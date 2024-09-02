@@ -1,5 +1,4 @@
 name: 'Terraform'
-
 on:
   push:
     branches: [ "main" ]
@@ -8,59 +7,136 @@ on:
   pull_request:
     paths:
       - 'terraform/**'
+  workflow_dispatch:
 
 env:
   AWS_REGION: eu-north-1
   TF_WORKING_DIR: ./terraform
+  TF_VERSION: 1.9.5
+  BACKEND_DIR: ./terraform/backend
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
-  terraform:
-    name: 'Terraform'
+  backend-setup:
+    name: 'Terraform Backend Setup'
     runs-on: ubuntu-latest
-    environment: production
-
-    defaults:
-      run:
-        shell: bash
-        working-directory: ${{ env.TF_WORKING_DIR }}
-
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v1
-
-    - name: Configure AWS credentials
+    - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
-
-    - name: Terraform Init
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    - name: Terraform Init Backend Setup
       run: terraform init
+      working-directory: ${{ env.BACKEND_DIR }}
+    - name: Terraform Validate Backend Setup
+      run: terraform validate
+      working-directory: ${{ env.BACKEND_DIR }}
+    - name: Terraform Apply Backend Setup
+      run: terraform apply -auto-approve
+      working-directory: ${{ env.BACKEND_DIR }}
 
+  terraform-lint:
+    name: 'Terraform Lint'
+    needs: backend-setup
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
     - name: Terraform Format
       run: terraform fmt -check
+      working-directory: ${{ env.TF_WORKING_DIR }}
+    - name: tflint
+      uses: terraform-linters/setup-tflint@v3
+    - name: Run tflint
+      run: tflint --recursive
+      working-directory: ${{ env.TF_WORKING_DIR }}
 
+  terraform-security-scan:
+    name: 'Terraform Security Scan'
+    needs: backend-setup
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Run Checkov
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: ${{ env.TF_WORKING_DIR }}
+
+  terraform-plan:
+    name: 'Terraform Plan'
+    needs: [backend-setup, terraform-lint, terraform-security-scan]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    - name: Terraform Init
+      run: terraform init
+      working-directory: ${{ env.TF_WORKING_DIR }}
     - name: Terraform Validate
       run: terraform validate
-
+      working-directory: ${{ env.TF_WORKING_DIR }}
     - name: Terraform Plan
-      run: terraform plan -input=false
-      env:
-        TF_VAR_finnhub_api_key: ${{ secrets.FINNHUB_API_KEY }}
-        TF_VAR_msk_username: ${{ secrets.MSK_USERNAME }}
-        TF_VAR_msk_password: ${{ secrets.MSK_PASSWORD }}
+      run: terraform plan -out=tfplan
+      working-directory: ${{ env.TF_WORKING_DIR }}
+    - name: Upload Terraform Plan
+      uses: actions/upload-artifact@v3
+      with:
+        name: tfplan
+        path: ${{ env.TF_WORKING_DIR }}/tfplan
 
+  terraform-apply:
+    name: 'Terraform Apply'
+    needs: terraform-plan
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    - name: Terraform Init
+      run: terraform init
+      working-directory: ${{ env.TF_WORKING_DIR }}
+    - name: Download Terraform Plan
+      uses: actions/download-artifact@v3
+      with:
+        name: tfplan
+        path: ${{ env.TF_WORKING_DIR }}
     - name: Terraform Apply
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: terraform apply -auto-approve -input=false
-      env:
-        TF_VAR_finnhub_api_key: ${{ secrets.FINNHUB_API_KEY }}
-        TF_VAR_msk_username: ${{ secrets.MSK_USERNAME }}
-        TF_VAR_msk_password: ${{ secrets.MSK_PASSWORD }}
+      run: terraform apply -auto-approve tfplan
+      working-directory: ${{ env.TF_WORKING_DIR }}
