@@ -113,6 +113,4 @@ if __name__ == "__main__":
         connector.connect_to_websocket()
     except Exception as e:
         logging.error(f"Fatal error: {e}")
-        raise 
-        
-        
+        raise
