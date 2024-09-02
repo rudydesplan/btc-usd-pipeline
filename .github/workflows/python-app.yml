@@ -41,7 +41,7 @@ jobs:
     
     - name: Test with pytest and coverage
       run: |
-        pytest tests/test_btc_usd_fetcher.py --cov=src/fetcher --cov-report=xml
+        PYTHONPATH=src pytest tests/test_btc_usd_fetcher.py --cov=src/fetcher --cov-report=xml
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3

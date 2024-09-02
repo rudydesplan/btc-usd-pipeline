@@ -13,7 +13,7 @@ env:
   AWS_REGION: eu-north-1
   TF_WORKING_DIR: ./terraform
   TF_VERSION: 1.9.5
-  BACKEND_DIR: ./terraform/backend
+  BACKEND_DIR: ./terraform/backend-setup
 
 permissions:
   contents: read
