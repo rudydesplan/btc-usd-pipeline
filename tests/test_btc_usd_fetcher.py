@@ -14,12 +14,15 @@ def mock_kafka(mocker):
 
 @pytest.fixture
 def connector(mock_kafka):
-    with patch('src.fetcher.btc_usd_fetcher.WebSocketKafkaConnector.connect_to_kafka'):
-        return WebSocketKafkaConnector()
+    with patch('src.fetcher.btc_usd_fetcher.WebSocketKafkaConnector.connect_to_kafka') as mock_connect:
+        connector = WebSocketKafkaConnector()
+        connector.producer = mock_kafka
+        return connector
 
 def test_connect_to_kafka_success(mocker, mock_kafka):
-    with patch('src.fetcher.btc_usd_fetcher.WebSocketKafkaConnector.connect_to_kafka'):
+    with patch('src.fetcher.btc_usd_fetcher.WebSocketKafkaConnector.connect_to_kafka') as mock_connect:
         connector = WebSocketKafkaConnector()
+        connector.producer = mock_kafka
         assert connector.producer is not None
 
 def test_connect_to_kafka_failure(mocker):

@@ -37,6 +37,10 @@ class WebSocketKafkaConnector:
         raise ConnectionError("Failed to connect to Kafka")
 
     def on_message(self, ws, message):
+        if self.producer is None:
+            logging.error("Kafka producer is not initialized")
+            return
+
         try:
             data = json.loads(message)
             logging.debug(f"Raw WebSocket message: {message}")
