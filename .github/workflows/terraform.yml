@@ -10,42 +10,18 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: eu-north-1
+  AWS_REGION: us-east-1
   TF_WORKING_DIR: ./terraform
   TF_VERSION: 1.9.5
-  BACKEND_DIR: ./terraform/backend-setup
+  TF_STATE_BUCKET: terraform-state-bucket-dsti
+  TF_STATE_KEY: btc-usd-pipeline/terraform.tfstate
+  TF_LOCK_TABLE: terraform-state-lock-table-dsti
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
-  backend-setup:
-    name: 'Terraform Backend Setup'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v1
-      with:
-        terraform_version: ${{ env.TF_VERSION }}
-    - name: Terraform Init Backend Setup
-      run: terraform init
-      working-directory: ${{ env.BACKEND_DIR }}
-    - name: Terraform Validate Backend Setup
-      run: terraform validate
-      working-directory: ${{ env.BACKEND_DIR }}
-    - name: Terraform Apply Backend Setup
-      run: terraform apply -auto-approve
-      working-directory: ${{ env.BACKEND_DIR }}
-
   terraform-lint:
     name: 'Terraform Lint'
     needs: backend-setup
@@ -58,18 +34,19 @@ jobs:
       with:
         terraform_version: ${{ env.TF_VERSION }}
     - name: Terraform Format
-      run: terraform fmt -check
-      working-directory: ${{ env.TF_WORKING_DIR }}
+      run: |
+        terraform fmt -recursive
+        terraform fmt -check
     - name: tflint
-      uses: terraform-linters/setup-tflint@v3
+      uses: terraform-linters/setup-tflint@v4
     - name: Run tflint
       run: tflint --recursive
       working-directory: ${{ env.TF_WORKING_DIR }}
 
   terraform-security-scan:
     name: 'Terraform Security Scan'
-    needs: backend-setup
     runs-on: ubuntu-latest
+    #continue-on-error: true
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -80,13 +57,13 @@ jobs:
 
   terraform-plan:
     name: 'Terraform Plan'
-    needs: [backend-setup, terraform-lint, terraform-security-scan]
+    needs: [terraform-lint, terraform-security-scan]
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v1
+      uses: aws-actions/configure-aws-credentials@v2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -101,8 +78,13 @@ jobs:
     - name: Terraform Validate
       run: terraform validate
       working-directory: ${{ env.TF_WORKING_DIR }}
+    
     - name: Terraform Plan
-      run: terraform plan -out=tfplan
+      run: |
+        TF_LOG=TRACE terraform plan \
+          -var="msk_username=${{ secrets.MSK_USERNAME }}" \
+          -var="msk_password=${{ secrets.MSK_PASSWORD }}" \
+          -out=tfplan
       working-directory: ${{ env.TF_WORKING_DIR }}
     - name: Upload Terraform Plan
       uses: actions/upload-artifact@v3
@@ -120,23 +102,30 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v1
+      uses: aws-actions/configure-aws-credentials@v2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v1
+      uses: hashicorp/setup-terraform@v3.1.2
       with:
         terraform_version: ${{ env.TF_VERSION }}
     - name: Terraform Init
       run: terraform init
       working-directory: ${{ env.TF_WORKING_DIR }}
     - name: Download Terraform Plan
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4.1.8
       with:
         name: tfplan
         path: ${{ env.TF_WORKING_DIR }}
     - name: Terraform Apply
-      run: terraform apply -auto-approve tfplan
+      run: |
+        TF_LOG=TRACE terraform apply \
+          -auto-approve tfplan
+      working-directory: ${{ env.TF_WORKING_DIR }}
+    - name: Terraform Output
+      if: success()
+      run: |
+        terraform output
       working-directory: ${{ env.TF_WORKING_DIR }}

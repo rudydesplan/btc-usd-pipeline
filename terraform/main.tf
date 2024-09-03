@@ -1,19 +1,22 @@
-terraform {
-  backend "s3" {
-    bucket         = "terraform-state-bucket"
-    key            = "btc-usd-pipeline/terraform.tfstate"
-    region         = "eu-north-1"
-    encrypt        = true
-    dynamodb_table = "terraform-state-lock-table"
+# Configure the AWS provider
+provider "aws" {
+  region = "us-east-1"  # Replace with your preferred region
+}
+
+# Create a DynamoDB table for Terraform state locking
+resource "aws_dynamodb_table" "terraform_state_lock" {
+  name           = "terraform-state-lock-table-dsti"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "LockID"
+
+  attribute {
+    name = "LockID"
+    type = "S"
   }
 }
 
-provider "aws" {
-  region = var.aws_region
-}
-
-# CloudWatch Log Group
-resource "aws_cloudwatch_log_group" "btc_usd_logs" {
-  name              = "/ecs/btc-usd-fetcher"
-  retention_in_days = 7
+# Output the DynamoDB table name
+output "dynamodb_table_name" {
+  value       = aws_dynamodb_table.terraform_state_lock.name
+  description = "The name of the DynamoDB table for Terraform state locking"
 }
