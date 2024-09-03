@@ -129,4 +129,3 @@ output "kms_key_arn" {
   value       = aws_kms_key.dynamodb_encryption_key.arn
   description = "The ARN of the KMS key used for DynamoDB encryption"
 }
-

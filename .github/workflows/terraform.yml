@@ -9,6 +9,10 @@ on:
       - 'terraform/**'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   AWS_REGION: us-east-1
   TF_WORKING_DIR: ./terraform
@@ -29,7 +33,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v1
+      uses: hashicorp/setup-terraform@v3.1.2
       with:
         terraform_version: ${{ env.TF_VERSION }}
     - name: Terraform Format
@@ -67,7 +71,7 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v1
+      uses: hashicorp/setup-terraform@v3.1.2
       with:
         terraform_version: ${{ env.TF_VERSION }}
     - name: Terraform Init
@@ -82,7 +86,7 @@ jobs:
           -out=tfplan
       working-directory: ${{ env.TF_WORKING_DIR }}
     - name: Upload Terraform Plan
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4.4.0
       with:
         name: tfplan
         path: ${{ env.TF_WORKING_DIR }}/tfplan
@@ -111,7 +115,7 @@ jobs:
       run: terraform init
       working-directory: ${{ env.TF_WORKING_DIR }}
     - name: Download Terraform Plan
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v4.1.8
       with:
         name: tfplan
         path: ${{ env.TF_WORKING_DIR }}
