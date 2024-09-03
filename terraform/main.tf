@@ -15,6 +15,13 @@ provider "aws" {
   region = "us-east-1"  # Replace with your preferred region
 }
 
+# Create a KMS key for DynamoDB encryption
+resource "aws_kms_key" "dynamodb_encryption_key" {
+  description             = "KMS key for DynamoDB table encryption"
+  deletion_window_in_days = 10
+  enable_key_rotation     = true
+}
+
 # Create a DynamoDB table for Terraform state locking
 resource "aws_dynamodb_table" "terraform_state_lock" {
   name           = "terraform-state-lock-table-dsti"
@@ -24,6 +31,17 @@ resource "aws_dynamodb_table" "terraform_state_lock" {
   attribute {
     name = "LockID"
     type = "S"
+  }
+
+  # Enable point-in-time recovery
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  # Enable server-side encryption with KMS
+  server_side_encryption {
+    enabled     = true
+    kms_key_arn = aws_kms_key.dynamodb_encryption_key.arn
   }
 
   tags = {
@@ -36,4 +54,10 @@ resource "aws_dynamodb_table" "terraform_state_lock" {
 output "dynamodb_table_name" {
   value       = aws_dynamodb_table.terraform_state_lock.name
   description = "The name of the DynamoDB table for Terraform state locking"
+}
+
+# Output the KMS key ARN
+output "kms_key_arn" {
+  value       = aws_kms_key.dynamodb_encryption_key.arn
+  description = "The ARN of the KMS key used for DynamoDB encryption"
 }
