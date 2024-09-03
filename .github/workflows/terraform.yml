@@ -1,3 +1,58 @@
+name: 'Terraform'
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'terraform/**'
+  pull_request:
+    paths:
+      - 'terraform/**'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  TF_WORKING_DIR: ./terraform
+  TF_VERSION: 1.9.5
+  TF_STATE_BUCKET: terraform-state-bucket-dsti
+  TF_STATE_KEY: btc-usd-pipeline/terraform.tfstate
+  TF_LOCK_TABLE: terraform-state-lock-table-dsti
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  terraform-lint:
+    name: 'Terraform Lint'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v1
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+    - name: Terraform Format
+      run: |
+        terraform fmt -recursive
+        terraform fmt -check
+    - name: tflint
+      uses: terraform-linters/setup-tflint@v4
+    - name: Run tflint
+      run: tflint --recursive
+      working-directory: ${{ env.TF_WORKING_DIR }}
+
+  terraform-security-scan:
+    name: 'Terraform Security Scan'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Run Checkov
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: ${{ env.TF_WORKING_DIR }}
+
   terraform-plan:
     name: 'Terraform Plan'
     needs: [terraform-lint, terraform-security-scan]
