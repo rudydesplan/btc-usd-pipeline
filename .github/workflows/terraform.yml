@@ -24,7 +24,6 @@ permissions:
 jobs:
   terraform-lint:
     name: 'Terraform Lint'
-    needs: backend-setup
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
