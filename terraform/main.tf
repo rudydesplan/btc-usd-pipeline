@@ -15,11 +15,46 @@ provider "aws" {
   region = "us-east-1"  # Replace with your preferred region
 }
 
+# Data source to get the current AWS account ID
+data "aws_caller_identity" "current" {}
+
+# Create IAM policy document for KMS key
+data "aws_iam_policy_document" "kms_key_policy" {
+  statement {
+    sid    = "Enable IAM User Permissions"
+    effect = "Allow"
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "Allow DynamoDB to use the key"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["dynamodb.amazonaws.com"]
+    }
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey"
+    ]
+    resources = ["*"]
+  }
+}
+
 # Create a KMS key for DynamoDB encryption
 resource "aws_kms_key" "dynamodb_encryption_key" {
   description             = "KMS key for DynamoDB table encryption"
   deletion_window_in_days = 10
   enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.kms_key_policy.json
 }
 
 # Create a DynamoDB table for Terraform state locking
