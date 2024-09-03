@@ -45,7 +45,6 @@ jobs:
   terraform-security-scan:
     name: 'Terraform Security Scan'
     runs-on: ubuntu-latest
-    #continue-on-error: true
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -85,7 +84,7 @@ jobs:
     - name: Upload Terraform Plan
       uses: actions/upload-artifact@v3
       with:
-        name: tfplan
+        name: tfplan-${{ github.run_id }}
         path: ${{ env.TF_WORKING_DIR }}/tfplan
 
   terraform-apply:
@@ -113,12 +112,19 @@ jobs:
     - name: Download Terraform Plan
       uses: actions/download-artifact@v4.1.8
       with:
-        name: tfplan
+        name: tfplan-${{ github.run_id }}
         path: ${{ env.TF_WORKING_DIR }}
+    - name: Verify Downloaded Artifact
+      run: |
+        if [ ! -f "${{ env.TF_WORKING_DIR }}/tfplan" ]; then
+          echo "Error: Terraform plan file not found"
+          exit 1
+        fi
+        ls -la ${{ env.TF_WORKING_DIR }}
     - name: Terraform Apply
       run: |
         TF_LOG=TRACE terraform apply \
-          -auto-approve tfplan
+          -auto-approve ${{ env.TF_WORKING_DIR }}/tfplan
       working-directory: ${{ env.TF_WORKING_DIR }}
     - name: Terraform Output
       if: success()
