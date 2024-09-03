@@ -81,8 +81,8 @@ jobs:
     - name: Terraform Plan
       run: |
         TF_LOG=TRACE terraform plan \
-          -var="msk_username=${{ secrets.MSK_USERNAME }}" \
-          -var="msk_password=${{ secrets.MSK_PASSWORD }}" \
+#          -var="msk_username=${{ secrets.MSK_USERNAME }}" \
+#          -var="msk_password=${{ secrets.MSK_PASSWORD }}" \
           -out=tfplan
       working-directory: ${{ env.TF_WORKING_DIR }}
     - name: Upload Terraform Plan

@@ -16,17 +16,17 @@ provider "aws" {
 }
 
 # Variables for MSK credentials
-variable "msk_username" {
-  description = "Username for MSK authentication"
-  type        = string
-  sensitive   = true
-}
+#variable "msk_username" {
+#  description = "Username for MSK authentication"
+#  type        = string
+#  sensitive   = true
+#}
 
-variable "msk_password" {
-  description = "Password for MSK authentication"
-  type        = string
-  sensitive   = true
-}
+#variable "msk_password" {
+#  description = "Password for MSK authentication"
+#  type        = string
+#  sensitive   = true
+#}
 
 # Data source to get the current AWS account ID
 data "aws_caller_identity" "current" {}
