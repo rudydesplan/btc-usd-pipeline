@@ -4,9 +4,11 @@ on:
     branches: [ "main" ]
     paths:
       - 'terraform/**'
+      - '.github/workflows/terraform.yml'
   pull_request:
     paths:
       - 'terraform/**'
+      - '.github/workflows/terraform.yml'
   workflow_dispatch:
 
 concurrency:
@@ -129,7 +131,7 @@ jobs:
     - name: Terraform Apply
       run: |
         TF_LOG=TRACE terraform apply \
-          -auto-approve ${{ env.TF_WORKING_DIR }}/tfplan
+          -auto-approve tfplan
       working-directory: ${{ env.TF_WORKING_DIR }}
     - name: Terraform Output
       if: success()
