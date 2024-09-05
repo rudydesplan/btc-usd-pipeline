@@ -1,32 +1,49 @@
-# Dedicated S3 bucket for storing access logs (No logging on this bucket)
-# Skip Checkov checks for CKV_AWS_18 and CKV_AWS_144
+# Provider configuration
+provider "aws" {
+  region = "us-east-1"  # Assuming this is your primary region
+}
+
+provider "aws" {
+  alias  = "replication_region"
+  region = "eu-north-1"
+}
+
+# Central Logging Bucket
 resource "aws_s3_bucket" "central_logging_bucket" {
-    #checkov:skip=CKV_AWS_18:No access logging required for logging bucket
-    #checkov:skip=CKV_AWS_144:No cross-region replication required for logging bucket
+  #checkov:skip=CKV_AWS_18:No access logging required for logging bucket
+  #checkov:skip=CKV_AWS_144:No cross-region replication required for logging bucket
   bucket = "terraform-central-logging-bucket-dsti"
-
-  versioning {
-    enabled = true
-  }
-
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "aws:kms"
-      }
-    }
-  }
-
-  lifecycle_rule {
-    enabled = true
-    expiration {
-      days = 365
-    }
-  }
 
   tags = {
     Name        = "Central Logging Bucket"
     Environment = "Development"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "central_logging_bucket_versioning" {
+  bucket = aws_s3_bucket.central_logging_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "central_logging_bucket_encryption" {
+  bucket = aws_s3_bucket.central_logging_bucket.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "aws:kms"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "central_logging_bucket_lifecycle" {
+  bucket = aws_s3_bucket.central_logging_bucket.id
+  rule {
+    id     = "expire_after_365_days"
+    status = "Enabled"
+    expiration {
+      days = 365
+    }
   }
 }
 
@@ -39,55 +56,9 @@ resource "aws_s3_bucket_public_access_block" "central_logging_bucket_public_acce
   restrict_public_buckets = true
 }
 
-# Declare the S3 bucket for Terraform state storage with replication configuration
+# Terraform State Bucket
 resource "aws_s3_bucket" "terraform_state_bucket" {
   bucket = "terraform-state-bucket-dsti"
-
-  versioning {
-    enabled = true
-  }
-
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "aws:kms"  # Updated to use KMS for encryption
-      }
-    }
-  }
-
-  logging {
-    target_bucket = aws_s3_bucket.central_logging_bucket.bucket
-    target_prefix = "terraform-state-access-logs/"
-  }
-
-  lifecycle_rule {
-    enabled = true
-    noncurrent_version_expiration {
-      days = 30
-    }
-    expiration {
-      days = 365
-    }
-  }
-
-  # Replication configuration directly in the terraform_state_bucket resource
-  replication_configuration {
-    role = aws_iam_role.replication_role.arn
-
-    rules {
-      id     = "ReplicationRule"
-      status = "Enabled"
-
-      destination {
-        bucket        = aws_s3_bucket.replication_bucket.arn
-        storage_class = "STANDARD"
-      }
-
-      filter {
-        prefix = ""  # Replicate all objects
-      }
-    }
-  }
 
   tags = {
     Name        = "Terraform State Bucket"
@@ -95,6 +66,60 @@ resource "aws_s3_bucket" "terraform_state_bucket" {
   }
 }
 
+resource "aws_s3_bucket_versioning" "terraform_state_bucket_versioning" {
+  bucket = aws_s3_bucket.terraform_state_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state_bucket_encryption" {
+  bucket = aws_s3_bucket.terraform_state_bucket.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "aws:kms"
+    }
+  }
+}
+
+resource "aws_s3_bucket_logging" "terraform_state_bucket_logging" {
+  bucket = aws_s3_bucket.terraform_state_bucket.id
+  target_bucket = aws_s3_bucket.central_logging_bucket.id
+  target_prefix = "terraform-state-access-logs/"
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "terraform_state_bucket_lifecycle" {
+  bucket = aws_s3_bucket.terraform_state_bucket.id
+  rule {
+    id     = "expire_noncurrent_versions"
+    status = "Enabled"
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+    expiration {
+      days = 365
+    }
+  }
+}
+
+resource "aws_s3_bucket_replication_configuration" "terraform_state_bucket_replication" {
+  bucket = aws_s3_bucket.terraform_state_bucket.id
+  role   = aws_iam_role.replication_role.arn
+
+  rule {
+    id     = "ReplicationRule"
+    status = "Enabled"
+
+    destination {
+      bucket        = aws_s3_bucket.replication_bucket.arn
+      storage_class = "STANDARD"
+    }
+
+    filter {
+      prefix = ""  # Replicate all objects
+    }
+  }
+}
 
 resource "aws_s3_bucket_public_access_block" "terraform_state_bucket_public_access_block" {
   bucket = aws_s3_bucket.terraform_state_bucket.id
@@ -105,43 +130,11 @@ resource "aws_s3_bucket_public_access_block" "terraform_state_bucket_public_acce
   restrict_public_buckets = true
 }
 
-
-# Create a destination bucket in another region for cross-region replication
-provider "aws" {
-  alias  = "replication_region"
-  region = "eu-north-1"
-}
-
-# Skip Checkov check for CKV_AWS_144
-
+# Replication Bucket
 resource "aws_s3_bucket" "replication_bucket" {
   provider = aws.replication_region
   #checkov:skip=CKV_AWS_144:Cross-region replication is already implemented
   bucket   = "terraform-state-replication-bucket-dsti"
-
-  versioning {
-    enabled = true
-  }
-
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "aws:kms"
-      }
-    }
-  }
-
-  logging {
-    target_bucket = aws_s3_bucket.replication_logging_bucket.id
-    target_prefix = "replication-access-logs/"
-  }
-
-  lifecycle_rule {
-    enabled = true
-    expiration {
-      days = 365
-    }
-  }
 
   tags = {
     Name        = "Terraform Replication Bucket"
@@ -149,9 +142,100 @@ resource "aws_s3_bucket" "replication_bucket" {
   }
 }
 
+resource "aws_s3_bucket_versioning" "replication_bucket_versioning" {
+  provider = aws.replication_region
+  bucket   = aws_s3_bucket.replication_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "replication_bucket_encryption" {
+  provider = aws.replication_region
+  bucket   = aws_s3_bucket.replication_bucket.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "aws:kms"
+    }
+  }
+}
+
+resource "aws_s3_bucket_logging" "replication_bucket_logging" {
+  provider      = aws.replication_region
+  bucket        = aws_s3_bucket.replication_bucket.id
+  target_bucket = aws_s3_bucket.replication_logging_bucket.id
+  target_prefix = "replication-access-logs/"
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "replication_bucket_lifecycle" {
+  provider = aws.replication_region
+  bucket   = aws_s3_bucket.replication_bucket.id
+  rule {
+    id     = "expire_after_365_days"
+    status = "Enabled"
+    expiration {
+      days = 365
+    }
+  }
+}
+
 resource "aws_s3_bucket_public_access_block" "replication_bucket_public_access_block" {
   provider = aws.replication_region
-  bucket = aws_s3_bucket.replication_bucket.id
+  bucket   = aws_s3_bucket.replication_bucket.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Replication Logging Bucket
+resource "aws_s3_bucket" "replication_logging_bucket" {
+  provider = aws.replication_region
+  #checkov:skip=CKV_AWS_18:No access logging required for logging bucket
+  #checkov:skip=CKV_AWS_144:No cross-region replication required for logging bucket
+  #checkov:skip=CKV2_AWS_62:No event notifications required for this logging bucket
+  bucket   = "terraform-replication-logging-bucket-dsti"
+
+  tags = {
+    Name        = "Replication Logging Bucket"
+    Environment = "Development"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "replication_logging_bucket_versioning" {
+  provider = aws.replication_region
+  bucket   = aws_s3_bucket.replication_logging_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "replication_logging_bucket_encryption" {
+  provider = aws.replication_region
+  bucket   = aws_s3_bucket.replication_logging_bucket.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "aws:kms"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "replication_logging_bucket_lifecycle" {
+  provider = aws.replication_region
+  bucket   = aws_s3_bucket.replication_logging_bucket.id
+  rule {
+    id     = "expire_after_365_days"
+    status = "Enabled"
+    expiration {
+      days = 365
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "replication_logging_bucket_public_access_block" {
+  provider = aws.replication_region
+  bucket   = aws_s3_bucket.replication_logging_bucket.id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -170,8 +254,8 @@ resource "aws_iam_role" "replication_role" {
       Principal = {
         Service = "s3.amazonaws.com"
       },
-      Effect   = "Allow",
-      Sid      = ""
+      Effect = "Allow",
+      Sid    = ""
     }]
   })
 }
@@ -211,49 +295,6 @@ resource "aws_iam_role_policy" "replication_policy" {
       }
     ]
   })
-}
-
-# Create a logging bucket in the replication region
-resource "aws_s3_bucket" "replication_logging_bucket" {
-  provider = aws.replication_region
-  #checkov:skip=CKV_AWS_18:No access logging required for logging bucket
-  #checkov:skip=CKV_AWS_144:No cross-region replication required for logging bucket
-  #checkov:skip=CKV2_AWS_62:No event notifications required for this logging bucket
-  bucket   = "terraform-replication-logging-bucket-dsti"
-
-  versioning {
-    enabled = true
-  }
-
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "aws:kms"
-      }
-    }
-  }
-
-  lifecycle_rule {
-    enabled = true
-    expiration {
-      days = 365
-    }
-  }
-
-  tags = {
-    Name        = "Replication Logging Bucket"
-    Environment = "Development"
-  }
-}
-
-resource "aws_s3_bucket_public_access_block" "replication_logging_bucket_public_access_block" {
-  provider = aws.replication_region
-  bucket   = aws_s3_bucket.replication_logging_bucket.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
 }
 
 # Outputs
