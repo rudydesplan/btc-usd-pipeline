@@ -178,7 +178,7 @@ jobs:
       with:
         terraform_version: ${{ env.TF_VERSION }}
     - name: Terraform Init
-      run: terraform init
+      run: terraform init -replace-state
       working-directory: ${{ env.TF_WORKING_DIR }}
     - name: Download Terraform Plan
       uses: actions/download-artifact@v4.1.8
