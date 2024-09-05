@@ -84,68 +84,79 @@ jobs:
       
     # Check and Import pre-existing resources
     - name: Check and Import Pre-existing Resources
-      run: |
-        import_resource() {
-          resource_type=$1
-          resource_name=$2
-          terraform_resource=$3
-          provider_flag=$4
-          region=$5
-          
-          if [ -n "$region" ]; then
-            AWS_REGION_FLAG="--region $region"
-          else
-            AWS_REGION_FLAG=""
-          fi
-          
-          if aws $AWS_REGION_FLAG $resource_type $resource_name > /dev/null 2>&1; then
-            echo "Importing existing $resource_type: $resource_name"
-            if [ -n "$provider_flag" ]; then
-              terraform import $provider_flag $terraform_resource $resource_name
-            else
-              terraform import $terraform_resource $resource_name
-            fi
-          else
-            echo "$resource_type $resource_name does not exist, skipping import"
-          fi
-        }
-        
-        # Central Logging Bucket
-        import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket.central_logging_bucket"
-        import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_versioning.central_logging_bucket_versioning"
-        import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.central_logging_bucket_encryption"
-        import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.central_logging_bucket_lifecycle"
-        import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_public_access_block.central_logging_bucket_public_access_block"
-        
-        # Terraform State Bucket
-        import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket.terraform_state_bucket"
-        import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_versioning.terraform_state_bucket_versioning"
-        import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.terraform_state_bucket_encryption"
-        import_resource "s3api get-bucket-logging --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_logging.terraform_state_bucket_logging"
-        import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.terraform_state_bucket_lifecycle"
-        import_resource "s3api get-bucket-replication --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_replication_configuration.terraform_state_bucket_replication"
-        import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_public_access_block.terraform_state_bucket_public_access_block"
-        
-        # Replication Bucket
-        import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket.replication_bucket" "-provider=aws.replication_region" "eu-north-1"
-        import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_versioning.replication_bucket_versioning" "-provider=aws.replication_region" "eu-north-1"
-        import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.replication_bucket_encryption" "-provider=aws.replication_region" "eu-north-1"
-        import_resource "s3api get-bucket-logging --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_logging.replication_bucket_logging" "-provider=aws.replication_region" "eu-north-1"
-        import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.replication_bucket_lifecycle" "-provider=aws.replication_region" "eu-north-1"
-        import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_public_access_block.replication_bucket_public_access_block" "-provider=aws.replication_region" "eu-north-1"
-        
-        # Replication Logging Bucket
-        import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket.replication_logging_bucket" "-provider=aws.replication_region" "eu-north-1"
-        import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_versioning.replication_logging_bucket_versioning" "-provider=aws.replication_region" "eu-north-1"
-        import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.replication_logging_bucket_encryption" "-provider=aws.replication_region" "eu-north-1"
-        import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.replication_logging_bucket_lifecycle" "-provider=aws.replication_region" "eu-north-1"
-        import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_public_access_block.replication_logging_bucket_public_access_block" "-provider=aws.replication_region" "eu-north-1"
-        
-        # IAM Role for Replication
-        import_resource "iam get-role --role-name" "s3-replication-role" "aws_iam_role.replication_role"
-        import_resource "iam get-role-policy --role-name s3-replication-role --policy-name" "replication_policy" "aws_iam_role_policy.replication_policy" "" "" "s3-replication-role:replication_policy"
-
-      working-directory: ${{ env.TF_WORKING_DIR }}
+          run: |
+            import_resource() {
+              resource_type=$1
+              resource_name=$2
+              terraform_resource=$3
+              provider_flag=$4
+              region=$5
+              
+              if [ -n "$region" ]; then
+                AWS_REGION_FLAG="--region $region"
+              else
+                AWS_REGION_FLAG=""
+              fi
+              
+              if aws $AWS_REGION_FLAG $resource_type $resource_name > /dev/null 2>&1; then
+                echo "Importing existing $resource_type: $resource_name"
+                if [ -n "$provider_flag" ]; then
+                  terraform import $provider_flag $terraform_resource $resource_name
+                else
+                  terraform import $terraform_resource $resource_name
+                fi
+                if [ $? -ne 0 ]; then
+                  echo "Failed to import $terraform_resource"
+                  exit 1
+                fi
+              else
+                echo "$resource_type $resource_name does not exist, skipping import"
+              fi
+            }
+            
+            # Ensure Terraform is initialized
+            terraform init
+            
+            # Central Logging Bucket
+            import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket.central_logging_bucket"
+            import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_versioning.central_logging_bucket_versioning"
+            import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.central_logging_bucket_encryption"
+            import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.central_logging_bucket_lifecycle"
+            import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_public_access_block.central_logging_bucket_public_access_block"
+            
+            # Terraform State Bucket
+            import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket.terraform_state_bucket"
+            import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_versioning.terraform_state_bucket_versioning"
+            import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.terraform_state_bucket_encryption"
+            import_resource "s3api get-bucket-logging --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_logging.terraform_state_bucket_logging"
+            import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.terraform_state_bucket_lifecycle"
+            import_resource "s3api get-bucket-replication --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_replication_configuration.terraform_state_bucket_replication"
+            import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_public_access_block.terraform_state_bucket_public_access_block"
+            
+            # Replication Bucket
+            import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket.replication_bucket" "-provider=aws.replication_region" "eu-north-1"
+            import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_versioning.replication_bucket_versioning" "-provider=aws.replication_region" "eu-north-1"
+            import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.replication_bucket_encryption" "-provider=aws.replication_region" "eu-north-1"
+            import_resource "s3api get-bucket-logging --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_logging.replication_bucket_logging" "-provider=aws.replication_region" "eu-north-1"
+            import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.replication_bucket_lifecycle" "-provider=aws.replication_region" "eu-north-1"
+            import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_public_access_block.replication_bucket_public_access_block" "-provider=aws.replication_region" "eu-north-1"
+            
+            # Replication Logging Bucket
+            import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket.replication_logging_bucket" "-provider=aws.replication_region" "eu-north-1"
+            import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_versioning.replication_logging_bucket_versioning" "-provider=aws.replication_region" "eu-north-1"
+            import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.replication_logging_bucket_encryption" "-provider=aws.replication_region" "eu-north-1"
+            import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.replication_logging_bucket_lifecycle" "-provider=aws.replication_region" "eu-north-1"
+            import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_public_access_block.replication_logging_bucket_public_access_block" "-provider=aws.replication_region" "eu-north-1"
+            
+            # IAM Role for Replication
+            import_resource "iam get-role --role-name" "s3-replication-role" "aws_iam_role.replication_role"
+            import_resource "iam get-role-policy --role-name s3-replication-role --policy-name" "replication_policy" "aws_iam_role_policy.replication_policy" "" "" "s3-replication-role:replication_policy"
+            
+          working-directory: ${{ env.TF_WORKING_DIR }}
+          env:
+            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
       
     - name: Terraform Validate
       run: terraform validate

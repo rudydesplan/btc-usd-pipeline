@@ -26,6 +26,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "central_logging_b
   }
 }
 
+
+
 resource "aws_s3_bucket_lifecycle_configuration" "central_logging_bucket_lifecycle" {
   bucket = aws_s3_bucket.central_logging_bucket.id
   rule {
