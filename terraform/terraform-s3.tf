@@ -39,8 +39,13 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "central_logging_b
 resource "aws_s3_bucket_lifecycle_configuration" "central_logging_bucket_lifecycle" {
   bucket = aws_s3_bucket.central_logging_bucket.id
   rule {
-    id     = "expire_after_365_days"
+    id     = "expire_after_365_days_and_abort_multipart"
     status = "Enabled"
+    
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+    
     expiration {
       days = 365
     }
@@ -91,11 +96,17 @@ resource "aws_s3_bucket_logging" "terraform_state_bucket_logging" {
 resource "aws_s3_bucket_lifecycle_configuration" "terraform_state_bucket_lifecycle" {
   bucket = aws_s3_bucket.terraform_state_bucket.id
   rule {
-    id     = "expire_noncurrent_versions"
+    id     = "expire_noncurrent_versions_and_abort_multipart"
     status = "Enabled"
+    
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+    
     noncurrent_version_expiration {
       noncurrent_days = 30
     }
+    
     expiration {
       days = 365
     }
@@ -171,8 +182,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "replication_bucket_lifecycle" 
   provider = aws.replication_region
   bucket   = aws_s3_bucket.replication_bucket.id
   rule {
-    id     = "expire_after_365_days"
+    id     = "expire_after_365_days_and_abort_multipart"
     status = "Enabled"
+    
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+    
     expiration {
       days = 365
     }
@@ -225,8 +241,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "replication_logging_bucket_lif
   provider = aws.replication_region
   bucket   = aws_s3_bucket.replication_logging_bucket.id
   rule {
-    id     = "expire_after_365_days"
+    id     = "expire_after_365_days_and_abort_multipart"
     status = "Enabled"
+    
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+    
     expiration {
       days = 365
     }
