@@ -1,17 +1,34 @@
 #SNS topic for each bucket
 
 resource "aws_sns_topic" "central_logging_bucket_topic" {
-  name = "s3-central-logging-bucket-events"
+  name              = "s3-central-logging-bucket-events"
+  kms_master_key_id = aws_kms_key.sns_encryption_key.id
 }
 
 resource "aws_sns_topic" "terraform_state_bucket_topic" {
-  name = "s3-terraform-state-bucket-events"
+  name              = "s3-terraform-state-bucket-events"
+  kms_master_key_id = aws_kms_key.sns_encryption_key.id
 }
 
 resource "aws_sns_topic" "replication_bucket_topic" {
-  provider = aws.replication_region
-  name     = "s3-replication-bucket-events"
+  provider          = aws.replication_region
+  name              = "s3-replication-bucket-events"
+  kms_master_key_id = aws_kms_key.sns_encryption_key_replication.id
 }
+
+resource "aws_kms_key" "sns_encryption_key" {
+  description             = "KMS key for SNS topic encryption"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+}
+
+resource "aws_kms_key" "sns_encryption_key_replication" {
+  provider                = aws.replication_region
+  description             = "KMS key for SNS topic encryption in replication region"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+}
+
 
 #SNS topic policy for each topic to allow S3 to publish messages
 
@@ -134,4 +151,14 @@ output "terraform_state_bucket_topic_arn" {
 output "replication_bucket_topic_arn" {
   value       = aws_sns_topic.replication_bucket_topic.arn
   description = "The ARN of the SNS topic for replication bucket events"
+}
+
+output "sns_encryption_key_arn" {
+  value       = aws_kms_key.sns_encryption_key.arn
+  description = "The ARN of the KMS key used for SNS encryption"
+}
+
+output "sns_encryption_key_replication_arn" {
+  value       = aws_kms_key.sns_encryption_key_replication.arn
+  description = "The ARN of the KMS key used for SNS encryption in the replication region"
 }

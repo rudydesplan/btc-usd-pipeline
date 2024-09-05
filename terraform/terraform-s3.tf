@@ -9,7 +9,7 @@ resource "aws_s3_bucket" "central_logging_bucket" {
   server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
-        sse_algorithm = "aws:kms"  # Updated to use KMS for encryption
+        sse_algorithm = "aws:kms"
       }
     }
   }
@@ -37,6 +37,7 @@ resource "aws_s3_bucket_public_access_block" "central_logging_bucket_public_acce
 }
 
 # Declare the S3 bucket for Terraform state storage
+# Declare the S3 bucket for Terraform state storage with replication configuration
 resource "aws_s3_bucket" "terraform_state_bucket" {
   bucket = "terraform-state-bucket-dsti"
 
@@ -67,11 +68,31 @@ resource "aws_s3_bucket" "terraform_state_bucket" {
     }
   }
 
+  # Replication configuration directly in the terraform_state_bucket resource
+  replication_configuration {
+    role = aws_iam_role.replication_role.arn
+
+    rules {
+      id     = "ReplicationRule"
+      status = "Enabled"
+
+      destination {
+        bucket        = aws_s3_bucket.replication_bucket.arn
+        storage_class = "STANDARD"
+      }
+
+      filter {
+        prefix = ""  # Replicate all objects
+      }
+    }
+  }
+
   tags = {
     Name        = "Terraform State Bucket"
     Environment = "Development"
   }
 }
+
 
 resource "aws_s3_bucket_public_access_block" "terraform_state_bucket_public_access_block" {
   bucket = aws_s3_bucket.terraform_state_bucket.id
@@ -185,27 +206,6 @@ resource "aws_iam_role_policy" "replication_policy" {
       }
     ]
   })
-}
-
-# Cross-region replication configuration for the Terraform state bucket
-resource "aws_s3_bucket_replication_configuration" "replication" {
-  role = aws_iam_role.replication_role.arn
-
-  rules {
-    id     = "ReplicationRule"
-    status = "Enabled"
-
-    destination {
-      bucket        = aws_s3_bucket.replication_bucket.arn
-      storage_class = "STANDARD"
-    }
-
-    filter {
-      prefix = ""  # Replicate all objects
-    }
-  }
-
-  depends_on = [aws_s3_bucket.terraform_state_bucket, aws_s3_bucket.replication_bucket]
 }
 
 # Outputs
