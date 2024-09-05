@@ -216,6 +216,9 @@ resource "aws_iam_role_policy" "replication_policy" {
 # Create a logging bucket in the replication region
 resource "aws_s3_bucket" "replication_logging_bucket" {
   provider = aws.replication_region
+  #checkov:skip=CKV_AWS_18:No access logging required for logging bucket
+  #checkov:skip=CKV_AWS_62:No access event notifications enabled
+  #checkov:skip=CKV_AWS_144:No cross-region replication required for logging bucket
   bucket   = "terraform-replication-logging-bucket-dsti"
 
   versioning {
