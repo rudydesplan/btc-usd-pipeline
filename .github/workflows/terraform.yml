@@ -58,7 +58,6 @@ jobs:
   # The import step for pre-existing resources
   import-existing:
     name: 'Check and Import Pre-existing Resources'
-    needs: setup-backend
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
