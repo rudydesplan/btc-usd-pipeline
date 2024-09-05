@@ -22,7 +22,7 @@ env:
   TF_STATE_BUCKET: terraform-state-bucket-dsti
   TF_STATE_KEY: btc-usd-pipeline/terraform.tfstate
   TF_LOCK_TABLE: terraform-state-lock-table-dsti
-  #S3_BUCKET_NAME: terraform-state-bucket-dsti
+  S3_BUCKET_NAME: terraform-state-bucket-dsti
 
 permissions:
   contents: read
@@ -177,9 +177,22 @@ jobs:
       uses: hashicorp/setup-terraform@v3.1.2
       with:
         terraform_version: ${{ env.TF_VERSION }}
-    - name: Terraform Init
-      run: terraform init -replace-state
+    - name: Terraform Init and State Manipulation
+      run: |
+        # Initialize Terraform
+        terraform init
+        
+        # Pull the current state
+        terraform state pull > current_state.tfstate
+        
+        # Modify the state file to remove the lineage
+        jq 'del(.lineage)' current_state.tfstate > modified_state.tfstate
+        
+        # Push the modified state back
+        terraform state push modified_state.tfstate
       working-directory: ${{ env.TF_WORKING_DIR }}
+    
+    
     - name: Download Terraform Plan
       uses: actions/download-artifact@v4.1.8
       with:
