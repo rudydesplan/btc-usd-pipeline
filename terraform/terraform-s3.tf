@@ -317,6 +317,12 @@ resource "aws_dynamodb_table" "terraform_lock_table" {
   }
 }
 
+resource "aws_s3_bucket_logging" "terraform_state_bucket_logging" {
+  bucket        = aws_s3_bucket.terraform_state_bucket.id
+  target_bucket = "terraform-central-logging-bucket-dsti"  # Replace with the correct central logging bucket name
+  target_prefix = "terraform-state-access-logs/"
+}
+
 # Outputs for the state management resources
 output "terraform_state_bucket_name" {
   value       = aws_s3_bucket.terraform_state_bucket.id
