@@ -6,7 +6,13 @@ resource "aws_ecr_repository" "btc_usd_fetcher" {
     scan_on_push = true
   }
 
-  image_tag_mutability = "MUTABLE" # Allows mutable tags like "latest"
+  # Ensure image tags are immutable to prevent overwriting
+  image_tag_mutability = "IMMUTABLE"
+
+  # Ensure encryption using the default AWS-managed KMS key
+  encryption_configuration {
+    encryption_type = "KMS"
+  }
 
   tags = {
     Name        = "BTC USD Fetcher"
