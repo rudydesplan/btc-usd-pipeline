@@ -131,7 +131,7 @@ jobs:
         import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_versioning.terraform_state_bucket_versioning"
         import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.terraform_state_bucket_encryption"
         import_resource "s3api get-bucket-logging --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_logging.terraform_state_bucket_logging"
-        import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.terraform_state_bucket_lifecycle"
+        # import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.terraform_state_bucket_lifecycle"
         import_resource "s3api get-bucket-replication --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_replication_configuration.terraform_state_bucket_replication"
         import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_public_access_block.terraform_state_bucket_public_access_block"
         
