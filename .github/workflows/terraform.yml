@@ -85,63 +85,75 @@ jobs:
     # Check and Import pre-existing resources
     - name: Check and Import Pre-existing Resources
       run: |
-        # Check if the DynamoDB table exists
-        if aws dynamodb describe-table --table-name ${{ env.TF_LOCK_TABLE }} > /dev/null 2>&1; then
-          terraform import aws_dynamodb_table.terraform_state_lock ${{ env.TF_LOCK_TABLE }}
-        fi
+        import_resource() {
+          resource_type=$1
+          resource_name=$2
+          terraform_resource=$3
+          provider_flag=$4
+          region=$5
+          if [ -n "$region" ]; then
+            AWS_REGION_FLAG="--region $region"
+          else
+            AWS_REGION_FLAG=""
+          fi
+          if aws $AWS_REGION_FLAG $resource_type $resource_name > /dev/null 2>&1; then
+            echo "Importing existing $resource_type: $resource_name"
+            if [ -n "$provider_flag" ]; then
+              terraform import $provider_flag $terraform_resource $resource_name
+            else
+              terraform import $terraform_resource $resource_name
+            fi
+          else
+            echo "$resource_type $resource_name does not exist, skipping import"
+          fi
+        }
+        # Import S3 buckets and their configurations
+        buckets=(
+          "terraform-central-logging-bucket-dsti"
+          "terraform-state-bucket-dsti"
+          "terraform-state-replication-bucket-dsti"
+          "terraform-replication-logging-bucket-dsti"
+        )
+        for bucket in "${buckets[@]}"; do
+          provider_flag=""
+          region=""
+          if [[ "$bucket" == *"replication"* ]]; then
+            provider_flag="-provider=aws.replication_region"
+            region="eu-north-1"
+          fi
+          import_resource "s3api head-bucket --bucket" "$bucket" "aws_s3_bucket.${bucket//-/_}" "$provider_flag" "$region"
+          import_resource "s3api head-bucket --bucket" "$bucket" "aws_s3_bucket_versioning.${bucket//-/_}_versioning" "$provider_flag" "$region"
+          import_resource "s3api head-bucket --bucket" "$bucket" "aws_s3_bucket_server_side_encryption_configuration.${bucket//-/_}_encryption" "$provider_flag" "$region"
+          import_resource "s3api head-bucket --bucket" "$bucket" "aws_s3_bucket_lifecycle_configuration.${bucket//-/_}_lifecycle" "$provider_flag" "$region"
+          import_resource "s3api head-bucket --bucket" "$bucket" "aws_s3_bucket_public_access_block.${bucket//-/_}_public_access_block" "$provider_flag" "$region"
+        done
         
-        # Check if the S3 buckets and IAM role exist
+        # Import S3 bucket logging configurations
+        import_resource "s3api get-bucket-logging --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_logging.terraform_state_bucket_logging"
+        import_resource "s3api get-bucket-logging --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_logging.replication_bucket_logging" "-provider=aws.replication_region" "eu-north-1"
         
-        # Check if the S3 state bucket exists
-        if aws s3api head-bucket --bucket "terraform-state-bucket-dsti" > /dev/null 2>&1; then
-          terraform import aws_s3_bucket.terraform_state_bucket terraform-state-bucket-dsti
-        fi
+        # Import S3 bucket replication configuration
+        import_resource "s3api get-bucket-replication --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_replication_configuration.terraform_state_bucket_replication"
         
-        # Check if the central logging bucket exists
-        if aws s3api head-bucket --bucket "terraform-central-logging-bucket-dsti" > /dev/null 2>&1; then
-          terraform import aws_s3_bucket.central_logging_bucket terraform-central-logging-bucket-dsti
-        fi
+        # Import IAM role and policy
+        import_resource "iam get-role --role-name" "s3-replication-role" "aws_iam_role.replication_role"
+        import_resource "iam get-role-policy --role-name s3-replication-role --policy-name" "replication_policy" "aws_iam_role_policy.replication_policy" "" "" "s3-replication-role:replication_policy"
         
-        # Check if the S3 replication bucket exists (in the replication region)
-        if aws --region eu-north-1 s3api head-bucket --bucket "terraform-state-replication-bucket-dsti" > /dev/null 2>&1; then
-          terraform import -provider=aws.replication_region aws_s3_bucket.replication_bucket terraform-state-replication-bucket-dsti
-        fi
+        # Import KMS keys
+        import_resource "kms describe-key --key-id" "$(terraform output -raw sns_encryption_key_arn)" "aws_kms_key.sns_encryption_key"
+        import_resource "kms describe-key --key-id" "$(terraform output -raw sns_encryption_key_replication_arn)" "aws_kms_key.sns_encryption_key_replication" "-provider=aws.replication_region" "eu-north-1"
         
-        # Check if the IAM role for replication exists
-        if aws iam get-role --role-name s3-replication-role > /dev/null 2>&1; then
-          terraform import aws_iam_role.replication_role s3-replication-role
-        fi
+        # Import SNS topics
+        import_resource "sns get-topic-attributes --topic-arn" "$(terraform output -raw central_logging_bucket_topic_arn)" "aws_sns_topic.central_logging_bucket_topic"
+        import_resource "sns get-topic-attributes --topic-arn" "$(terraform output -raw terraform_state_bucket_topic_arn)" "aws_sns_topic.terraform_state_bucket_topic"
+        import_resource "sns get-topic-attributes --topic-arn" "$(terraform output -raw replication_bucket_topic_arn)" "aws_sns_topic.replication_bucket_topic" "-provider=aws.replication_region" "eu-north-1"
         
-        # Check if the IAM role policy for replication exists
-        if aws iam get-role-policy --role-name s3-replication-role --policy-name replication_policy > /dev/null 2>&1; then
-          terraform import aws_iam_role_policy.replication_policy s3-replication-role:replication_policy
-        fi
+        # Import ECR repository
+        import_resource "ecr describe-repositories --repository-names" "btc-usd-fetcher" "aws_ecr_repository.btc_usd_fetcher"
         
-        # Check if the KMS key for SNS encryption exists
-        if aws kms describe-key --key-id $(terraform output sns_encryption_key_arn) > /dev/null 2>&1; then
-          terraform import aws_kms_key.sns_encryption_key $(terraform output sns_encryption_key_arn)
-        fi
-        
-        # Check if the KMS key for SNS encryption (replication) exists
-        if aws --region eu-north-1 kms describe-key --key-id $(terraform output sns_encryption_key_replication_arn) > /dev/null 2>&1; then
-          terraform import -provider=aws.replication_region aws_kms_key.sns_encryption_key_replication $(terraform output sns_encryption_key_replication_arn)
-        fi
-        
-        # Check if the SNS topics exist
-        if aws sns get-topic-attributes --topic-arn $(terraform output central_logging_bucket_topic_arn) > /dev/null 2>&1; then
-          terraform import aws_sns_topic.central_logging_bucket_topic $(terraform output central_logging_bucket_topic_arn)
-        fi
-        
-        if aws sns get-topic-attributes --topic-arn $(terraform output terraform_state_bucket_topic_arn) > /dev/null 2>&1; then
-          terraform import aws_sns_topic.terraform_state_bucket_topic $(terraform output terraform_state_bucket_topic_arn)
-        fi
-        
-        if aws --region eu-north-1 sns get-topic-attributes --topic-arn $(terraform output replication_bucket_topic_arn) > /dev/null 2>&1; then
-          terraform import -provider=aws.replication_region aws_sns_topic.replication_bucket_topic $(terraform output replication_bucket_topic_arn)
-        fi
-        
-        # Add more resources as necessary following the same pattern...
-        
+        # Import DynamoDB table
+        import_resource "dynamodb describe-table --table-name" "${{ env.TF_LOCK_TABLE }}" "aws_dynamodb_table.terraform_state_lock"
+
       working-directory: ${{ env.TF_WORKING_DIR }}
       
     - name: Terraform Validate

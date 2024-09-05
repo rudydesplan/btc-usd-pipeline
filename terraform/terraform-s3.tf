@@ -116,7 +116,7 @@ provider "aws" {
 
 resource "aws_s3_bucket" "replication_bucket" {
   provider = aws.replication_region
-	#checkov:skip=CKV_AWS_144:Cross-region replication is already implemented
+  #checkov:skip=CKV_AWS_144:Cross-region replication is already implemented
   bucket   = "terraform-state-replication-bucket-dsti"
 
   versioning {
@@ -126,13 +126,13 @@ resource "aws_s3_bucket" "replication_bucket" {
   server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
-        sse_algorithm = "aws:kms"  # Updated to use KMS for encryption
+        sse_algorithm = "aws:kms"
       }
     }
   }
 
   logging {
-    target_bucket = aws_s3_bucket.central_logging_bucket.bucket
+    target_bucket = aws_s3_bucket.replication_logging_bucket.id
     target_prefix = "replication-access-logs/"
   }
 
@@ -213,6 +213,53 @@ resource "aws_iam_role_policy" "replication_policy" {
   })
 }
 
+# Create a logging bucket in the replication region
+resource "aws_s3_bucket" "replication_logging_bucket" {
+  provider = aws.replication_region
+  bucket   = "terraform-replication-logging-bucket-dsti"
+
+  versioning {
+    enabled = true
+  }
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "aws:kms"
+      }
+    }
+  }
+
+  lifecycle_rule {
+    enabled = true
+    expiration {
+      days = 365
+    }
+  }
+
+  tags = {
+    Name        = "Replication Logging Bucket"
+    Environment = "Development"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "replication_logging_bucket_public_access_block" {
+  provider = aws.replication_region
+  bucket   = aws_s3_bucket.replication_logging_bucket.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+
+
+
+
+
+
+
 # Outputs
 output "central_logging_bucket_name" {
   value       = aws_s3_bucket.central_logging_bucket.id
@@ -257,4 +304,19 @@ output "terraform_state_bucket_public_access_block_status" {
 output "replication_bucket_public_access_block_status" {
   value       = aws_s3_bucket_public_access_block.replication_bucket_public_access_block
   description = "Public access block configuration for the replication bucket"
+}
+
+output "replication_logging_bucket_name" {
+  value       = aws_s3_bucket.replication_logging_bucket.id
+  description = "The name of the replication logging bucket"
+}
+
+output "replication_logging_bucket_arn" {
+  value       = aws_s3_bucket.replication_logging_bucket.arn
+  description = "The ARN of the replication logging bucket"
+}
+
+output "replication_logging_bucket_public_access_block_status" {
+  value       = aws_s3_bucket_public_access_block.replication_logging_bucket_public_access_block
+  description = "Public access block configuration for the replication logging bucket"
 }
