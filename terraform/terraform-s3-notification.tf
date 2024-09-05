@@ -136,6 +136,72 @@ resource "aws_s3_bucket_notification" "replication_bucket_notification" {
   depends_on = [aws_sns_topic_policy.replication_bucket_topic_policy]
 }
 
+resource "aws_kms_key" "sns_encryption_key" {
+  description             = "KMS key for SNS topic encryption"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect    = "Allow",
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        },
+        Action    = "kms:*",
+        Resource  = "*"
+      },
+      {
+        Effect    = "Allow",
+        Principal = {
+          Service = "sns.amazonaws.com"
+        },
+        Action    = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey*"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_kms_key" "sns_encryption_key_replication" {
+  provider                = aws.replication_region
+  description             = "KMS key for SNS topic encryption in replication region"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect    = "Allow",
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        },
+        Action    = "kms:*",
+        Resource  = "*"
+      },
+      {
+        Effect    = "Allow",
+        Principal = {
+          Service = "sns.amazonaws.com"
+        },
+        Action    = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey*"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+
+
+
 #Outputs
 
 output "central_logging_bucket_topic_arn" {
