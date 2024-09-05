@@ -105,10 +105,10 @@ jobs:
             echo "$resource_type $resource_name does not exist, skipping import"
           fi
         }
-
-        # Ensure Terraform is initialized
-        terraform init
-
+        
+        # Ensure Terraform is initialized in the correct directory (main terraform directory)
+        terraform init -chdir=./terraform
+        
         # Central Logging Bucket
         import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket.central_logging_bucket"
         import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_versioning.central_logging_bucket_versioning"
@@ -139,7 +139,7 @@ jobs:
         import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.replication_logging_bucket_encryption" "-provider=aws.replication_region" "eu-north-1"
         import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.replication_logging_bucket_lifecycle" "-provider=aws.replication_region" "eu-north-1"
         import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_public_access_block.replication_logging_bucket_public_access_block" "-provider=aws.replication_region" "eu-north-1"
-
+        
         # IAM Role for Replication
         import_resource "iam get-role --role-name" "s3-replication-role" "aws_iam_role.replication_role"
         import_resource "iam get-role-policy --role-name s3-replication-role --policy-name" "replication_policy" "aws_iam_role_policy.replication_policy" "" "" "s3-replication-role:replication_policy"
