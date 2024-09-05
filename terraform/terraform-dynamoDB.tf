@@ -15,36 +15,6 @@ provider "aws" {
   region = "us-east-1"  # Replace with your preferred region
 }
 
-# Declare the S3 bucket for Terraform state storage
-resource "aws_s3_bucket" "terraform_state_bucket" {
-  bucket = "terraform-state-bucket-dsti"
-
-  versioning {
-    enabled = true
-  }
-
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
-      }
-    }
-  }
-
-  tags = {
-    Name        = "Terraform State Bucket"
-    Environment = "Development"
-  }
-}
-
-# Output the S3 bucket name
-output "s3_bucket_name" {
-  value       = aws_s3_bucket.terraform_state_bucket.bucket
-  description = "The name of the S3 bucket for Terraform state"
-}
-
-
-
 # Variables for MSK credentials
 #variable "msk_username" {
 #  description = "Username for MSK authentication"
