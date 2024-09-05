@@ -1,3 +1,6 @@
+# Skip Checkov checks for CKV_AWS_18 and CKV_AWS_144
+# checkov:skip=CKV_AWS_18:No access logging required for logging bucket
+# checkov:skip=CKV_AWS_144:No cross-region replication required for logging bucket
 # Dedicated S3 bucket for storing access logs (No logging on this bucket)
 resource "aws_s3_bucket" "central_logging_bucket" {
   bucket = "terraform-central-logging-bucket-dsti"
@@ -110,6 +113,8 @@ provider "aws" {
   region = "eu-north-1"
 }
 
+# Skip Checkov check for CKV_AWS_144
+# checkov:skip=CKV_AWS_144:Cross-region replication is already implemented
 resource "aws_s3_bucket" "replication_bucket" {
   provider = aws.replication_region
   bucket   = "terraform-state-replication-bucket-dsti"

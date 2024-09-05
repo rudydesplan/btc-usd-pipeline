@@ -116,6 +116,29 @@ jobs:
           terraform import aws_iam_role_policy.replication_policy s3-replication-role:replication_policy
         fi
         
+        # Check if the KMS key for SNS encryption exists
+        if aws kms describe-key --key-id $(terraform output sns_encryption_key_arn) > /dev/null 2>&1; then
+          terraform import aws_kms_key.sns_encryption_key $(terraform output sns_encryption_key_arn)
+        fi
+        
+        # Check if the KMS key for SNS encryption (replication) exists
+        if aws --region eu-north-1 kms describe-key --key-id $(terraform output sns_encryption_key_replication_arn) > /dev/null 2>&1; then
+          terraform import -provider=aws.replication_region aws_kms_key.sns_encryption_key_replication $(terraform output sns_encryption_key_replication_arn)
+        fi
+        
+        # Check if the SNS topics exist
+        if aws sns get-topic-attributes --topic-arn $(terraform output central_logging_bucket_topic_arn) > /dev/null 2>&1; then
+          terraform import aws_sns_topic.central_logging_bucket_topic $(terraform output central_logging_bucket_topic_arn)
+        fi
+        
+        if aws sns get-topic-attributes --topic-arn $(terraform output terraform_state_bucket_topic_arn) > /dev/null 2>&1; then
+          terraform import aws_sns_topic.terraform_state_bucket_topic $(terraform output terraform_state_bucket_topic_arn)
+        fi
+        
+        if aws --region eu-north-1 sns get-topic-attributes --topic-arn $(terraform output replication_bucket_topic_arn) > /dev/null 2>&1; then
+          terraform import -provider=aws.replication_region aws_sns_topic.replication_bucket_topic $(terraform output replication_bucket_topic_arn)
+        fi
+        
         # Add more resources as necessary following the same pattern...
         
       working-directory: ${{ env.TF_WORKING_DIR }}
