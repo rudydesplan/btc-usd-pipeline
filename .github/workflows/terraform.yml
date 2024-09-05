@@ -90,19 +90,25 @@ jobs:
             AWS_REGION_FLAG=""
           fi
           
-          if aws $AWS_REGION_FLAG $resource_type $resource_name > /dev/null 2>&1; then
-            echo "Importing existing $resource_type: $resource_name"
-            if [ -n "$provider_flag" ]; then
-              terraform import $provider_flag $terraform_resource $resource_name
-            else
-              terraform import $terraform_resource $resource_name
-            fi
-            if [ $? -ne 0 ]; then
-              echo "Failed to import $terraform_resource"
-              exit 1
-            fi
+          # Check if the resource is already managed by Terraform
+          if terraform state list | grep -q "$terraform_resource"; then
+            echo "$terraform_resource is already managed by Terraform, skipping import."
           else
-            echo "$resource_type $resource_name does not exist, skipping import"
+            # Proceed with the import if not managed by Terraform
+            if aws $AWS_REGION_FLAG $resource_type $resource_name > /dev/null 2>&1; then
+              echo "Importing existing $resource_type: $resource_name"
+              if [ -n "$provider_flag" ]; then
+                terraform import $provider_flag $terraform_resource $resource_name
+              else
+                terraform import $terraform_resource $resource_name
+              fi
+              if [ $? -ne 0 ]; then
+                echo "Failed to import $terraform_resource"
+                exit 1
+              fi
+            else
+              echo "$resource_type $resource_name does not exist, skipping import"
+            fi
           fi
         }
         
