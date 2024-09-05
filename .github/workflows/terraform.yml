@@ -91,11 +91,13 @@ jobs:
           terraform_resource=$3
           provider_flag=$4
           region=$5
+          
           if [ -n "$region" ]; then
             AWS_REGION_FLAG="--region $region"
           else
             AWS_REGION_FLAG=""
           fi
+          
           if aws $AWS_REGION_FLAG $resource_type $resource_name > /dev/null 2>&1; then
             echo "Importing existing $resource_type: $resource_name"
             if [ -n "$provider_flag" ]; then
@@ -107,25 +109,29 @@ jobs:
             echo "$resource_type $resource_name does not exist, skipping import"
           fi
         }
+        
         # Import S3 buckets and their configurations
         buckets=(
-          "terraform-central-logging-bucket-dsti"
-          "terraform-state-bucket-dsti"
-          "terraform-state-replication-bucket-dsti"
-          "terraform-replication-logging-bucket-dsti"
+          "central_logging_bucket:terraform-central-logging-bucket-dsti"
+          "terraform_state_bucket:terraform-state-bucket-dsti"
+          "replication_bucket:terraform-state-replication-bucket-dsti"
+          "replication_logging_bucket:terraform-replication-logging-bucket-dsti"
         )
-        for bucket in "${buckets[@]}"; do
+        
+        for bucket_pair in "${buckets[@]}"; do
+          IFS=':' read -r resource_name bucket_name <<< "$bucket_pair"
           provider_flag=""
           region=""
-          if [[ "$bucket" == *"replication"* ]]; then
+          if [[ "$bucket_name" == *"replication"* ]]; then
             provider_flag="-provider=aws.replication_region"
             region="eu-north-1"
           fi
-          import_resource "s3api head-bucket --bucket" "$bucket" "aws_s3_bucket.${bucket//-/_}" "$provider_flag" "$region"
-          import_resource "s3api head-bucket --bucket" "$bucket" "aws_s3_bucket_versioning.${bucket//-/_}_versioning" "$provider_flag" "$region"
-          import_resource "s3api head-bucket --bucket" "$bucket" "aws_s3_bucket_server_side_encryption_configuration.${bucket//-/_}_encryption" "$provider_flag" "$region"
-          import_resource "s3api head-bucket --bucket" "$bucket" "aws_s3_bucket_lifecycle_configuration.${bucket//-/_}_lifecycle" "$provider_flag" "$region"
-          import_resource "s3api head-bucket --bucket" "$bucket" "aws_s3_bucket_public_access_block.${bucket//-/_}_public_access_block" "$provider_flag" "$region"
+          
+          import_resource "s3api head-bucket --bucket" "$bucket_name" "aws_s3_bucket.$resource_name" "$provider_flag" "$region"
+          import_resource "s3api head-bucket --bucket" "$bucket_name" "aws_s3_bucket_versioning.${resource_name}_versioning" "$provider_flag" "$region"
+          import_resource "s3api head-bucket --bucket" "$bucket_name" "aws_s3_bucket_server_side_encryption_configuration.${resource_name}_encryption" "$provider_flag" "$region"
+          import_resource "s3api head-bucket --bucket" "$bucket_name" "aws_s3_bucket_lifecycle_configuration.${resource_name}_lifecycle" "$provider_flag" "$region"
+          import_resource "s3api head-bucket --bucket" "$bucket_name" "aws_s3_bucket_public_access_block.${resource_name}_public_access_block" "$provider_flag" "$region"
         done
         
         # Import S3 bucket logging configurations
@@ -152,7 +158,7 @@ jobs:
         import_resource "ecr describe-repositories --repository-names" "btc-usd-fetcher" "aws_ecr_repository.btc_usd_fetcher"
         
         # Import DynamoDB table
-        import_resource "dynamodb describe-table --table-name" "${{ env.TF_LOCK_TABLE }}" "aws_dynamodb_table.terraform_state_lock"
+        import_resource "dynamodb describe-table --table-name" "terraform-state-lock-table-dsti" "aws_dynamodb_table.terraform_state_lock"
 
       working-directory: ${{ env.TF_WORKING_DIR }}
       
