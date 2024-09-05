@@ -107,7 +107,7 @@ jobs:
         }
         
         # Ensure Terraform is initialized in the correct directory (main terraform directory)
-        terraform init -chdir=./terraform
+        cd ./terraform && terraform init
         
          # Central Logging Bucket
         import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket.central_logging_bucket"
