@@ -15,6 +15,11 @@ provider "aws" {
   region = "us-east-1"  # Replace with your preferred region
 }
 
+provider "aws" {
+  alias  = "replication_region"
+  region = "eu-north-1"
+}
+
 # Variables for MSK credentials
 #variable "msk_username" {
 #  description = "Username for MSK authentication"

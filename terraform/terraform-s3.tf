@@ -1,13 +1,3 @@
-# Provider configuration
-provider "aws" {
-  region = "us-east-1"  # Assuming this is your primary region
-}
-
-provider "aws" {
-  alias  = "replication_region"
-  region = "eu-north-1"
-}
-
 # Central Logging Bucket
 resource "aws_s3_bucket" "central_logging_bucket" {
   #checkov:skip=CKV_AWS_18:No access logging required for logging bucket
