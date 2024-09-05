@@ -84,7 +84,7 @@ jobs:
       
     # Check and Import pre-existing resources
     - name: Check and Import Pre-existing Resources
-        run: |
+         run: |
             import_resource() {
               resource_type=$1
               resource_name=$2
