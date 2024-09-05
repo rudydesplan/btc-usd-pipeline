@@ -9,7 +9,7 @@ resource "aws_s3_bucket" "central_logging_bucket" {
   server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
+        sse_algorithm = "aws:kms"  # Updated to use KMS for encryption
       }
     }
   }
@@ -45,7 +45,7 @@ resource "aws_s3_bucket" "terraform_state_bucket" {
   server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
-        sse_algorithm = "aws:kms"
+        sse_algorithm = "aws:kms"  # Updated to use KMS for encryption
       }
     }
   }
@@ -95,7 +95,7 @@ resource "aws_s3_bucket" "replication_bucket" {
   server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
+        sse_algorithm = "aws:kms"  # Updated to use KMS for encryption
       }
     }
   }
