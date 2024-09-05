@@ -398,11 +398,6 @@ resource "aws_s3_bucket_replication_configuration" "terraform_state_bucket_repli
   }
 }
 
-output "terraform_state_bucket_name" {
-  value       = aws_s3_bucket.terraform_state_bucket.id
-  description = "The name of the Terraform state bucket"
-}
-
 output "terraform_state_bucket_arn" {
   value       = aws_s3_bucket.terraform_state_bucket.arn
   description = "The ARN of the Terraform state bucket"
