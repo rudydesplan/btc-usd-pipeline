@@ -22,6 +22,7 @@ env:
   TF_STATE_BUCKET: terraform-state-bucket-dsti
   TF_STATE_KEY: btc-usd-pipeline/terraform.tfstate
   TF_LOCK_TABLE: terraform-state-lock-table-dsti
+  S3_BUCKET_NAME: terraform-state-bucket-dsti
 
 permissions:
   contents: read
@@ -79,6 +80,24 @@ jobs:
     - name: Terraform Init
       run: terraform init
       working-directory: ${{ env.TF_WORKING_DIR }}
+      
+    # Check and Import pre-existing resources
+    - name: Check and Import Pre-existing Resources
+      run: |
+        # Check if the DynamoDB table exists
+        if aws dynamodb describe-table --table-name ${{ env.TF_LOCK_TABLE }} > /dev/null 2>&1; then
+          terraform import aws_dynamodb_table.terraform_state_lock ${{ env.TF_LOCK_TABLE }}
+        fi
+
+        # Check if the S3 bucket exists
+        if aws s3api head-bucket --bucket ${{ env.S3_BUCKET_NAME }} > /dev/null 2>&1; then
+          terraform import aws_s3_bucket.terraform_state_bucket ${{ env.S3_BUCKET_NAME }}
+        fi
+        
+        # Add more resources as necessary following the same pattern...
+        
+      working-directory: ${{ env.TF_WORKING_DIR }}
+      
     - name: Terraform Validate
       run: terraform validate
       working-directory: ${{ env.TF_WORKING_DIR }}
