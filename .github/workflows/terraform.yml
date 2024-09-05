@@ -152,7 +152,7 @@ jobs:
   # The main infrastructure job, which applies the rest of the Terraform configuration
   terraform-main:
     name: 'Terraform Main Infrastructure'
-    needs: [setup-backend, import-existing]
+    needs: [import-existing]
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
