@@ -29,6 +29,7 @@ jobs:
   setup-backend:
     name: 'Setup Terraform State Backend'
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -117,6 +118,7 @@ jobs:
         import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_public_access_block.central_logging_bucket_public_access_block"
         
         # Terraform State Bucket
+        import_resource "dynamodb describe-table --table-name" "terraform-state-lock-table-dsti" "aws_dynamodb_table.terraform_lock_table"
         import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket.terraform_state_bucket"
         import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_versioning.terraform_state_bucket_versioning"
         import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.terraform_state_bucket_encryption"
