@@ -159,13 +159,13 @@ jobs:
         path: ${{ env.TF_WORKING_DIR }}/tfplan
         retention-days: 5
 
-    terraform-apply:
-      name: 'Terraform Apply'
-      needs: terraform-plan
-      runs-on: ubuntu-latest
-      environment: production
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      steps:
+  terraform-apply:
+    name: 'Terraform Apply'
+    needs: terraform-plan
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
       - name: Checkout
         uses: actions/checkout@v4
       
