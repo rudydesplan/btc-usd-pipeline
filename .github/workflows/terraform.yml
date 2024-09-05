@@ -77,6 +77,11 @@ jobs:
       uses: hashicorp/setup-terraform@v3.1.2
       with:
         terraform_version: ${{ env.TF_VERSION }}
+        
+    - name: Remove Manually Deleted S3 Bucket from State
+      run: terraform state rm aws_s3_bucket.terraform_state_bucket
+      working-directory: ${{ env.TF_WORKING_DIR }}
+ 
     - name: Terraform Init
       run: terraform init
       working-directory: ${{ env.TF_WORKING_DIR }}
