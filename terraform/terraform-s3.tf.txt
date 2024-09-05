@@ -178,4 +178,3 @@ resource "aws_s3_bucket_replication_configuration" "replication" {
 
   depends_on = [aws_s3_bucket.terraform_state_bucket, aws_s3_bucket.replication_bucket]
 }
-

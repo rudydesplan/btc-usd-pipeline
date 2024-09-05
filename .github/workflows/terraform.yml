@@ -88,33 +88,33 @@ jobs:
         if aws dynamodb describe-table --table-name ${{ env.TF_LOCK_TABLE }} > /dev/null 2>&1; then
           terraform import aws_dynamodb_table.terraform_state_lock ${{ env.TF_LOCK_TABLE }}
         fi
-
-# Check if the S3 buckets and IAM role exist
+        
+        # Check if the S3 buckets and IAM role exist
+        
         # Check if the S3 state bucket exists
         if aws s3api head-bucket --bucket "terraform-state-bucket-dsti" > /dev/null 2>&1; then
           terraform import aws_s3_bucket.terraform_state_bucket terraform-state-bucket-dsti
         fi
-
+        
         # Check if the S3 logging bucket exists
         if aws s3api head-bucket --bucket "terraform-logging-bucket-dsti" > /dev/null 2>&1; then
           terraform import aws_s3_bucket.terraform_logging_bucket terraform-logging-bucket-dsti
         fi
-
+        
         # Check if the S3 replication bucket exists (in the replication region)
         if aws --region eu-north-1 s3api head-bucket --bucket "terraform-state-replication-bucket-dsti" > /dev/null 2>&1; then
           terraform import -provider=aws.replication_region aws_s3_bucket.replication_bucket terraform-state-replication-bucket-dsti
         fi
-
+        
         # Check if the IAM role for replication exists
         if aws iam get-role --role-name s3-replication-role > /dev/null 2>&1; then
           terraform import aws_iam_role.replication_role s3-replication-role
         fi
-
+        
         # Check if the IAM role policy for replication exists
         if aws iam get-role-policy --role-name s3-replication-role --policy-name replication_policy > /dev/null 2>&1; then
           terraform import aws_iam_role_policy.replication_policy s3-replication-role:replication_policy
         fi
-
         
         # Add more resources as necessary following the same pattern...
         
