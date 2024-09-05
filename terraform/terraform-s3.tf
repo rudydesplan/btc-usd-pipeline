@@ -1,7 +1,7 @@
-# Skip Checkov checks for CKV_AWS_18 and CKV_AWS_144
-# checkov:skip=CKV_AWS_18:No access logging required for logging bucket
-# checkov:skip=CKV_AWS_144:No cross-region replication required for logging bucket
 # Dedicated S3 bucket for storing access logs (No logging on this bucket)
+# Skip Checkov checks for CKV_AWS_18 and CKV_AWS_144
+#checkov:skip=CKV_AWS_18:No access logging required for logging bucket
+#checkov:skip=CKV_AWS_144:No cross-region replication required for logging bucket
 resource "aws_s3_bucket" "central_logging_bucket" {
   bucket = "terraform-central-logging-bucket-dsti"
 
@@ -39,7 +39,6 @@ resource "aws_s3_bucket_public_access_block" "central_logging_bucket_public_acce
   restrict_public_buckets = true
 }
 
-# Declare the S3 bucket for Terraform state storage
 # Declare the S3 bucket for Terraform state storage with replication configuration
 resource "aws_s3_bucket" "terraform_state_bucket" {
   bucket = "terraform-state-bucket-dsti"
@@ -114,7 +113,7 @@ provider "aws" {
 }
 
 # Skip Checkov check for CKV_AWS_144
-# checkov:skip=CKV_AWS_144:Cross-region replication is already implemented
+#checkov:skip=CKV_AWS_144:Cross-region replication is already implemented
 resource "aws_s3_bucket" "replication_bucket" {
   provider = aws.replication_region
   bucket   = "terraform-state-replication-bucket-dsti"
