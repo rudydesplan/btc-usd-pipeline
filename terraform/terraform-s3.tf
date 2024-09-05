@@ -14,6 +14,20 @@ resource "aws_s3_bucket" "central_logging_bucket" {
     }
   }
 
+  block_public_access {
+    block_public_acls   = true
+    block_public_policy = true
+    ignore_public_acls  = true
+    restrict_public_buckets = true
+  }
+
+  lifecycle_rule {
+    enabled = true
+    expiration {
+      days = 365
+    }
+  }
+
   tags = {
     Name        = "Central Logging Bucket"
     Environment = "Development"
@@ -36,7 +50,6 @@ resource "aws_s3_bucket" "terraform_state_bucket" {
     }
   }
 
-  # Enable Public Access Block
   block_public_access {
     block_public_acls   = true
     block_public_policy = true
@@ -44,22 +57,18 @@ resource "aws_s3_bucket" "terraform_state_bucket" {
     restrict_public_buckets = true
   }
 
-  # Enable access logging (specify the central logging bucket)
   logging {
     target_bucket = aws_s3_bucket.central_logging_bucket.bucket
     target_prefix = "terraform-state-access-logs/"
   }
 
-  # Enable lifecycle configuration for cleaning up old versions of objects
   lifecycle_rule {
     enabled = true
-
     noncurrent_version_expiration {
-      days = 30  # Cleanup non-current versions after 30 days
+      days = 30
     }
-
     expiration {
-      days = 365  # Cleanup objects after 365 days
+      days = 365
     }
   }
 
@@ -91,10 +100,23 @@ resource "aws_s3_bucket" "replication_bucket" {
     }
   }
 
-  # Enable access logging (use the central logging bucket)
+  block_public_access {
+    block_public_acls   = true
+    block_public_policy = true
+    ignore_public_acls  = true
+    restrict_public_buckets = true
+  }
+
   logging {
     target_bucket = aws_s3_bucket.central_logging_bucket.bucket
     target_prefix = "replication-access-logs/"
+  }
+
+  lifecycle_rule {
+    enabled = true
+    expiration {
+      days = 365
+    }
   }
 
   tags = {
@@ -138,7 +160,7 @@ resource "aws_iam_role_policy" "replication_policy" {
           "s3:ReplicateTags"
         ],
         Resource = [
-          "arn:aws:s3:::${aws_s3_bucket.terraform_state_bucket.bucket}/*"  # Source bucket
+          "arn:aws:s3:::${aws_s3_bucket.terraform_state_bucket.bucket}/*"
         ]
       },
       {
@@ -151,7 +173,7 @@ resource "aws_iam_role_policy" "replication_policy" {
       {
         Effect = "Allow",
         Action = "s3:PutObject",
-        Resource = "arn:aws:s3:::${aws_s3_bucket.replication_bucket.bucket}/*"  # Destination bucket
+        Resource = "arn:aws:s3:::${aws_s3_bucket.replication_bucket.bucket}/*"
       }
     ]
   })
@@ -166,7 +188,7 @@ resource "aws_s3_bucket_replication_configuration" "replication" {
     status = "Enabled"
 
     destination {
-      bucket        = aws_s3_bucket.replication_bucket.arn  # Destination bucket ARN
+      bucket        = aws_s3_bucket.replication_bucket.arn
       storage_class = "STANDARD"
     }
 

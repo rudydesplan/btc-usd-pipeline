@@ -96,9 +96,9 @@ jobs:
           terraform import aws_s3_bucket.terraform_state_bucket terraform-state-bucket-dsti
         fi
         
-        # Check if the S3 logging bucket exists
-        if aws s3api head-bucket --bucket "terraform-logging-bucket-dsti" > /dev/null 2>&1; then
-          terraform import aws_s3_bucket.terraform_logging_bucket terraform-logging-bucket-dsti
+        # Check if the central logging bucket exists
+        if aws s3api head-bucket --bucket "terraform-central-logging-bucket-dsti" > /dev/null 2>&1; then
+          terraform import aws_s3_bucket.central_logging_bucket terraform-central-logging-bucket-dsti
         fi
         
         # Check if the S3 replication bucket exists (in the replication region)
