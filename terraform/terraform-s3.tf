@@ -1,3 +1,25 @@
+# Dedicated S3 bucket for storing access logs (No logging on this bucket)
+resource "aws_s3_bucket" "central_logging_bucket" {
+  bucket = "terraform-central-logging-bucket-dsti"
+
+  versioning {
+    enabled = true
+  }
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+
+  tags = {
+    Name        = "Central Logging Bucket"
+    Environment = "Development"
+  }
+}
+
 # Declare the S3 bucket for Terraform state storage
 resource "aws_s3_bucket" "terraform_state_bucket" {
   bucket = "terraform-state-bucket-dsti"
@@ -22,9 +44,9 @@ resource "aws_s3_bucket" "terraform_state_bucket" {
     restrict_public_buckets = true
   }
 
-  # Enable access logging (specify another bucket for logs)
+  # Enable access logging (specify the central logging bucket)
   logging {
-    target_bucket = aws_s3_bucket.terraform_logging_bucket.bucket
+    target_bucket = aws_s3_bucket.central_logging_bucket.bucket
     target_prefix = "terraform-state-access-logs/"
   }
 
@@ -47,35 +69,6 @@ resource "aws_s3_bucket" "terraform_state_bucket" {
   }
 }
 
-# Create a new S3 bucket for storing access logs
-resource "aws_s3_bucket" "terraform_logging_bucket" {
-  bucket = "terraform-logging-bucket-dsti"
-
-  versioning {
-    enabled = true
-  }
-
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
-      }
-    }
-  }
-
-  tags = {
-    Name        = "Terraform Logging Bucket"
-    Environment = "Development"
-  }
-}
-
-# Output the logging bucket name
-output "logging_bucket_name" {
-  value       = aws_s3_bucket.terraform_logging_bucket.bucket
-  description = "The name of the logging bucket for Terraform state"
-}
-
-
 # Create a destination bucket in another region for cross-region replication
 provider "aws" {
   alias  = "replication_region"
@@ -96,6 +89,12 @@ resource "aws_s3_bucket" "replication_bucket" {
         sse_algorithm = "AES256"
       }
     }
+  }
+
+  # Enable access logging (use the central logging bucket)
+  logging {
+    target_bucket = aws_s3_bucket.central_logging_bucket.bucket
+    target_prefix = "replication-access-logs/"
   }
 
   tags = {
@@ -177,4 +176,10 @@ resource "aws_s3_bucket_replication_configuration" "replication" {
   }
 
   depends_on = [aws_s3_bucket.terraform_state_bucket, aws_s3_bucket.replication_bucket]
+}
+
+# Output the central logging bucket name
+output "central_logging_bucket_name" {
+  value       = aws_s3_bucket.central_logging_bucket.bucket
+  description = "The name of the central logging bucket"
 }
