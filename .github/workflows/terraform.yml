@@ -109,12 +109,19 @@ jobs:
         # Ensure Terraform is initialized in the correct directory (main terraform directory)
         terraform init -chdir=./terraform
         
-        # Central Logging Bucket
+         # Central Logging Bucket
         import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket.central_logging_bucket"
         import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_versioning.central_logging_bucket_versioning"
         import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.central_logging_bucket_encryption"
         import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.central_logging_bucket_lifecycle"
         import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_public_access_block.central_logging_bucket_public_access_block"
+        
+        # Terraform Import Commands for Central Logging Bucket:
+        terraform import aws_s3_bucket.central_logging_bucket terraform-central-logging-bucket-dsti
+        terraform import aws_s3_bucket_versioning.central_logging_bucket_versioning terraform-central-logging-bucket-dsti
+        terraform import aws_s3_bucket_server_side_encryption_configuration.central_logging_bucket_encryption terraform-central-logging-bucket-dsti
+        terraform import aws_s3_bucket_lifecycle_configuration.central_logging_bucket_lifecycle terraform-central-logging-bucket-dsti
+        terraform import aws_s3_bucket_public_access_block.central_logging_bucket_public_access_block terraform-central-logging-bucket-dsti
         
         # Terraform State Bucket
         import_resource "dynamodb describe-table --table-name" "terraform-state-lock-table-dsti" "aws_dynamodb_table.terraform_lock_table"
@@ -126,6 +133,16 @@ jobs:
         import_resource "s3api get-bucket-replication --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_replication_configuration.terraform_state_bucket_replication"
         import_resource "s3api head-bucket --bucket" "terraform-state-bucket-dsti" "aws_s3_bucket_public_access_block.terraform_state_bucket_public_access_block"
         
+        # Terraform Import Commands for Terraform State Bucket:
+        terraform import aws_dynamodb_table.terraform_lock_table terraform-state-lock-table-dsti
+        terraform import aws_s3_bucket.terraform_state_bucket terraform-state-bucket-dsti
+        terraform import aws_s3_bucket_versioning.terraform_state_bucket_versioning terraform-state-bucket-dsti
+        terraform import aws_s3_bucket_server_side_encryption_configuration.terraform_state_bucket_encryption terraform-state-bucket-dsti
+        terraform import aws_s3_bucket_logging.terraform_state_bucket_logging terraform-state-bucket-dsti
+        terraform import aws_s3_bucket_lifecycle_configuration.terraform_state_bucket_lifecycle terraform-state-bucket-dsti
+        terraform import aws_s3_bucket_replication_configuration.terraform_state_bucket_replication terraform-state-bucket-dsti
+        terraform import aws_s3_bucket_public_access_block.terraform_state_bucket_public_access_block terraform-state-bucket-dsti
+        
         # Replication Bucket
         import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket.replication_bucket" "-provider=aws.replication_region" "eu-north-1"
         import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_versioning.replication_bucket_versioning" "-provider=aws.replication_region" "eu-north-1"
@@ -134,6 +151,14 @@ jobs:
         import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.replication_bucket_lifecycle" "-provider=aws.replication_region" "eu-north-1"
         import_resource "s3api head-bucket --bucket" "terraform-state-replication-bucket-dsti" "aws_s3_bucket_public_access_block.replication_bucket_public_access_block" "-provider=aws.replication_region" "eu-north-1"
         
+        # Terraform Import Commands for Replication Bucket:
+        terraform import -provider=aws.replication_region aws_s3_bucket.replication_bucket terraform-state-replication-bucket-dsti
+        terraform import -provider=aws.replication_region aws_s3_bucket_versioning.replication_bucket_versioning terraform-state-replication-bucket-dsti
+        terraform import -provider=aws.replication_region aws_s3_bucket_server_side_encryption_configuration.replication_bucket_encryption terraform-state-replication-bucket-dsti
+        terraform import -provider=aws.replication_region aws_s3_bucket_logging.replication_bucket_logging terraform-state-replication-bucket-dsti
+        terraform import -provider=aws.replication_region aws_s3_bucket_lifecycle_configuration.replication_bucket_lifecycle terraform-state-replication-bucket-dsti
+        terraform import -provider=aws.replication_region aws_s3_bucket_public_access_block.replication_bucket_public_access_block terraform-state-replication-bucket-dsti
+        
         # Replication Logging Bucket
         import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket.replication_logging_bucket" "-provider=aws.replication_region" "eu-north-1"
         import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_versioning.replication_logging_bucket_versioning" "-provider=aws.replication_region" "eu-north-1"
@@ -141,9 +166,20 @@ jobs:
         import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.replication_logging_bucket_lifecycle" "-provider=aws.replication_region" "eu-north-1"
         import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_public_access_block.replication_logging_bucket_public_access_block" "-provider=aws.replication_region" "eu-north-1"
         
+        # Terraform Import Commands for Replication Logging Bucket:
+        terraform import -provider=aws.replication_region aws_s3_bucket.replication_logging_bucket terraform-replication-logging-bucket-dsti
+        terraform import -provider=aws.replication_region aws_s3_bucket_versioning.replication_logging_bucket_versioning terraform-replication-logging-bucket-dsti
+        terraform import -provider=aws.replication_region aws_s3_bucket_server_side_encryption_configuration.replication_logging_bucket_encryption terraform-replication-logging-bucket-dsti
+        terraform import -provider=aws.replication_region aws_s3_bucket_lifecycle_configuration.replication_logging_bucket_lifecycle terraform-replication-logging-bucket-dsti
+        terraform import -provider=aws.replication_region aws_s3_bucket_public_access_block.replication_logging_bucket_public_access_block terraform-replication-logging-bucket-dsti
+        
         # IAM Role for Replication
         import_resource "iam get-role --role-name" "s3-replication-role" "aws_iam_role.replication_role"
         import_resource "iam get-role-policy --role-name s3-replication-role --policy-name" "replication_policy" "aws_iam_role_policy.replication_policy" "" "" "s3-replication-role:replication_policy"
+        
+        # Terraform Import Commands for IAM Role and Policy
+        terraform import aws_iam_role.replication_role s3-replication-role
+        terraform import aws_iam_role_policy.replication_policy s3-replication-role:replication_policy
 
     - name: Terraform Validate
       run: terraform validate
@@ -171,7 +207,7 @@ jobs:
         terraform_version: ${{ env.TF_VERSION }}
 
     - name: Terraform Init for Main Infrastructure
-      run: terraform init
+      run: cd ./terraform && terraform init
       working-directory: ./terraform
 
     - name: Terraform Plan
