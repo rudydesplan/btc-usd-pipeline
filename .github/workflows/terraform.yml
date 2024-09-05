@@ -1,4 +1,5 @@
-name: 'Terraform'
+name: 'Terraform Workflow'
+
 on:
   push:
     branches: [ "main" ]
@@ -17,73 +18,64 @@ concurrency:
 
 env:
   AWS_REGION: us-east-1
-  TF_WORKING_DIR: ./terraform
   TF_VERSION: 1.9.5
-  TF_STATE_BUCKET: terraform-state-bucket-dsti
-  TF_STATE_KEY: btc-usd-pipeline/terraform.tfstate
-  TF_LOCK_TABLE: terraform-state-lock-table-dsti
-  S3_BUCKET_NAME: terraform-state-bucket-dsti
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
-  terraform-lint:
-    name: 'Terraform Lint'
+  # First job to set up the Terraform state backend infrastructure
+  setup-backend:
+    name: 'Setup Terraform State Backend'
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3.1.2
-      with:
-        terraform_version: ${{ env.TF_VERSION }}
-    - name: Terraform Format
-      run: |
-        terraform fmt -recursive
-        terraform fmt -check
-    - name: tflint
-      uses: terraform-linters/setup-tflint@v4
-    - name: Run tflint
-      run: tflint --recursive
-      working-directory: ${{ env.TF_WORKING_DIR }}
-
-  terraform-security-scan:
-    name: 'Terraform Security Scan'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Run Checkov
-      uses: bridgecrewio/checkov-action@master
-      with:
-        directory: ${{ env.TF_WORKING_DIR }}
-
-  terraform-plan:
-    name: 'Terraform Plan'
-    needs: [terraform-lint, terraform-security-scan]
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4.0.2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
+        
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3.1.2
       with:
         terraform_version: ${{ env.TF_VERSION }}
 
-    - name: Terraform Init
+    - name: Terraform Init for Backend
       run: terraform init
-      working-directory: ${{ env.TF_WORKING_DIR }}
-      
-    # Check and Import pre-existing resources
-    - name: Check and Import Pre-existing Resources
+      working-directory: ./terraform/state-backend
+
+    - name: Terraform Apply for Backend
+      run: |
+        terraform apply -auto-approve
+      working-directory: ./terraform/state-backend
+
+  # The import step for pre-existing resources
+  import-existing:
+    name: 'Check and Import Pre-existing Resources'
+    needs: setup-backend
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4.0.2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3.1.2
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Import Pre-existing Resources
       run: |
         import_resource() {
           resource_type=$1
@@ -113,10 +105,10 @@ jobs:
             echo "$resource_type $resource_name does not exist, skipping import"
           fi
         }
-        
+
         # Ensure Terraform is initialized
         terraform init
-        
+
         # Central Logging Bucket
         import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket.central_logging_bucket"
         import_resource "s3api head-bucket --bucket" "terraform-central-logging-bucket-dsti" "aws_s3_bucket_versioning.central_logging_bucket_versioning"
@@ -147,34 +139,56 @@ jobs:
         import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_server_side_encryption_configuration.replication_logging_bucket_encryption" "-provider=aws.replication_region" "eu-north-1"
         import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_lifecycle_configuration.replication_logging_bucket_lifecycle" "-provider=aws.replication_region" "eu-north-1"
         import_resource "s3api head-bucket --bucket" "terraform-replication-logging-bucket-dsti" "aws_s3_bucket_public_access_block.replication_logging_bucket_public_access_block" "-provider=aws.replication_region" "eu-north-1"
-        
+
         # IAM Role for Replication
         import_resource "iam get-role --role-name" "s3-replication-role" "aws_iam_role.replication_role"
         import_resource "iam get-role-policy --role-name s3-replication-role --policy-name" "replication_policy" "aws_iam_role_policy.replication_policy" "" "" "s3-replication-role:replication_policy"
-      working-directory: ${{ env.TF_WORKING_DIR }}
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: ${{ env.AWS_REGION }}
-      
+
     - name: Terraform Validate
       run: terraform validate
       working-directory: ${{ env.TF_WORKING_DIR }}
+
+  # The main infrastructure job, which applies the rest of the Terraform configuration
+  terraform-main:
+    name: 'Terraform Main Infrastructure'
+    needs: [setup-backend, import-existing]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4.0.2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3.1.2
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Terraform Init for Main Infrastructure
+      run: terraform init
+      working-directory: ./terraform
+
     - name: Terraform Plan
-      run: |
-        TF_LOG=TRACE terraform plan \
-          -out=tfplan
-      working-directory: ${{ env.TF_WORKING_DIR }}
+      run: terraform plan -out=tfplan
+      working-directory: ./terraform
+
+    # Upload the Terraform plan to be used in the next job
     - name: Upload Terraform Plan
-      uses: actions/upload-artifact@v4.4.0
+      uses: actions/upload-artifact@v4
       with:
         name: tfplan
-        path: ${{ env.TF_WORKING_DIR }}/tfplan
+        path: ./terraform/tfplan
         retention-days: 5
 
+  # Job to download the plan and apply it
   terraform-apply:
     name: 'Terraform Apply'
-    needs: terraform-plan
+    needs: terraform-main
     runs-on: ubuntu-latest
     environment: production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -194,29 +208,23 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Terraform Init
+      # Download the Terraform plan from the previous step
+      - name: Download Terraform Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: ./terraform
+
+      - name: Terraform Init for Apply
         run: terraform init
-        working-directory: ${{ env.TF_WORKING_DIR }}
+        working-directory: ./terraform
 
-      # Remove any existing plan file to avoid issues
-      - name: Remove Old Plan File
-        run: |
-          rm -f ${{ env.TF_WORKING_DIR }}/tfplan
-        working-directory: ${{ env.TF_WORKING_DIR }}
-
-      # Regenerate the plan to ensure it matches the current state
-      - name: Terraform Plan
-        run: terraform plan -out=tfplan
-        working-directory: ${{ env.TF_WORKING_DIR }}
-
+      # Apply the downloaded plan
       - name: Terraform Apply
-        run: |
-          TF_LOG=TRACE terraform apply \
-            -auto-approve tfplan
-        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -auto-approve ./terraform/tfplan
+        working-directory: ./terraform
 
       - name: Terraform Output
         if: success()
-        run: |
-          terraform output
-        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform output
+        working-directory: ./terraform

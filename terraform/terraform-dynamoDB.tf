@@ -20,23 +20,10 @@ provider "aws" {
   region = "eu-north-1"
 }
 
-# Variables for MSK credentials
-#variable "msk_username" {
-#  description = "Username for MSK authentication"
-#  type        = string
-#  sensitive   = true
-#}
-
-#variable "msk_password" {
-#  description = "Password for MSK authentication"
-#  type        = string
-#  sensitive   = true
-#}
-
 # Data source to get the current AWS account ID
 data "aws_caller_identity" "current" {}
 
-# Create a KMS key for DynamoDB encryption
+# Create a KMS key for DynamoDB encryption (if required for other use cases)
 resource "aws_kms_key" "dynamodb_encryption_key" {
   description             = "KMS key for DynamoDB table encryption"
   deletion_window_in_days = 10
@@ -92,42 +79,8 @@ resource "aws_kms_key" "dynamodb_encryption_key" {
   })
 }
 
-# Create a DynamoDB table for Terraform state locking
-resource "aws_dynamodb_table" "terraform_state_lock" {
-  name           = "terraform-state-lock-table-dsti"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "LockID"
-
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
-
-  # Enable point-in-time recovery
-  point_in_time_recovery {
-    enabled = true
-  }
-
-  # Enable server-side encryption with KMS
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = aws_kms_key.dynamodb_encryption_key.arn
-  }
-
-  tags = {
-    Name        = "Terraform State Lock Table"
-    Environment = "Development"
-  }
-}
-
 # Data source to get the current AWS region
 data "aws_region" "current" {}
-
-# Output the DynamoDB table name
-output "dynamodb_table_name" {
-  value       = aws_dynamodb_table.terraform_state_lock.name
-  description = "The name of the DynamoDB table for Terraform state locking"
-}
 
 # Output the KMS key ARN
 output "kms_key_arn" {
